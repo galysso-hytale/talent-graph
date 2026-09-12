@@ -1,0 +1,25 @@
+{
+    "Group": "Galysso",
+    "Name": "talentgraph",
+    "Version": "0.1.0",
+    "Description": "Create and use talent graphs.",
+    "Authors": [
+        {
+            "Name": "Jocelin"
+        }
+    ],
+    "Website": "https://github.com/galysso/talent-graph",
+    "DisabledByDefault": false,
+    "IncludesAssetPack": false,
+    "Dependencies": {
+        
+    },
+    "OptionalDependencies": {
+        
+    },
+    "ServerVersion": ">=0.6.0 <0.7.0",
+    "Main": "dev.galysso.talentgraph.TalentGraphPlugin",
+    "UpdateChecker": {
+        "CurseForge": ""
+    }
+}

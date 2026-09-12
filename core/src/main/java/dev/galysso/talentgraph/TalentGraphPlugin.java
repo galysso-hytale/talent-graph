@@ -1,0 +1,31 @@
+package dev.galysso.talentgraph;
+
+import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
+import dev.galysso.talentgraph.command.TalentsCommand;
+import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
+
+import javax.annotation.Nonnull;
+
+/**
+ * Entry point declared as {@code Main} in {@code manifest.json}.
+ */
+public class TalentGraphPlugin extends JavaPlugin {
+
+    private final TalentGraphApiImpl api = new TalentGraphApiImpl();
+
+    public TalentGraphPlugin(@Nonnull JavaPluginInit init) {
+        super(init);
+        // Published from the constructor, not setup(): dependent plugins may
+        // already be resolving the API by the time our own setup() runs.
+        TalentGraphApiHolder.install(api);
+    }
+
+    @Override
+    protected void setup() {
+        api.registry().register(ExampleGraph.build());
+        getCommandRegistry().registerCommand(
+                new TalentsCommand("talents", "List the registered talent graphs", api));
+    }
+}
