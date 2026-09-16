@@ -34,6 +34,6 @@ public class TalentGraphPlugin extends JavaPlugin {
                 TalentProgressComponent.class, "TalentGraphProgress", TalentProgressComponent.CODEC);
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, progressType));
         getCommandRegistry().registerCommand(
-                new TalentsCommand("talents", "List the registered talent graphs", api));
+                new TalentsCommand("talents", "Open the talent page", api, layouts));
     }
 }

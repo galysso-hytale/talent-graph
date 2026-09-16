@@ -1,0 +1,66 @@
+$C = "../../Common.ui";
+$Sounds = "../../Sounds.ui";
+
+// One button per state, toggled through Visible by the server. Buttons carry
+// the tooltip because they are what the cursor actually hits.
+@StateButton = Button {
+  Visible: false;
+  TextTooltipShowDelay: 0.1;
+  TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+};
+
+Group {
+  Anchor: (Width: 64, Height: 64);
+
+  @StateButton #Locked {
+    Style: (
+      Sounds: $Sounds.@ButtonsLight,
+      Default: (Background: "Node/Locked.png"),
+      Hovered: (Background: "Node/Locked_Hovered.png")
+    );
+  }
+
+  @StateButton #Available {
+    Style: (
+      Sounds: $Sounds.@ButtonsLight,
+      Default: (Background: "Node/Available.png"),
+      Hovered: (Background: "Node/Available_Hovered.png")
+    );
+  }
+
+  @StateButton #Unlocked {
+    Style: (
+      Sounds: $Sounds.@ButtonsLight,
+      Default: (Background: "Node/Unlocked.png"),
+      Hovered: (Background: "Node/Unlocked_Hovered.png")
+    );
+  }
+
+  @StateButton #Maxed {
+    Style: (
+      Sounds: $Sounds.@ButtonsLight,
+      Default: (Background: "Node/Maxed.png"),
+      Hovered: (Background: "Node/Maxed_Hovered.png")
+    );
+  }
+
+  Group {
+    LayoutMode: CenterMiddle;
+
+    AssetImage #Icon {
+      Anchor: (Width: 40, Height: 40);
+      FallbackTexturePath: "UI/Custom/Pages/TalentGraph/Icons/Missing.png";
+    }
+  }
+
+  Group #RankBadge {
+    Anchor: (Right: -4, Bottom: -4, Width: 30, Height: 16);
+    Background: (Color: #060b14(0.85));
+    LayoutMode: CenterMiddle;
+
+    Label #Rank {
+      Style: (FontSize: 11, RenderBold: true, TextColor: #d6e4ee, HorizontalAlignment: Center, VerticalAlignment: Center);
+      Text: "0/1";
+    }
+  }
+}

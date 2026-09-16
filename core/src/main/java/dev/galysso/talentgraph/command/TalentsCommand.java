@@ -1,45 +1,54 @@
 package dev.galysso.talentgraph.command;
 
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import dev.galysso.talentgraph.api.Talent;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphApi;
+import dev.galysso.talentgraph.ui.GraphLayouts;
+import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.concurrent.CompletableFuture;
+import java.util.Comparator;
 
 /**
- * Lists the registered talent graphs. Smoke test that the plugin loaded and
- * that the API is reachable.
+ * {@code /talents} opens the talent page on the first registered graph.
+ * Sub-commands: {@code list}, {@code grant}.
  */
-public class TalentsCommand extends AbstractCommand {
+public class TalentsCommand extends AbstractPlayerCommand {
 
     private final TalentGraphApi api;
+    private final GraphLayouts layouts;
 
-    public TalentsCommand(String name, String description, TalentGraphApi api) {
+    public TalentsCommand(String name, String description, TalentGraphApi api, GraphLayouts layouts) {
         super(name, description);
         this.api = api;
+        this.layouts = layouts;
+        addSubCommand(new ListSubCommand(api));
+        addSubCommand(new GrantSubCommand(api));
     }
 
-    @Nullable
     @Override
-    protected CompletableFuture<Void> execute(@Nonnull CommandContext context) {
-        var graphs = api.registry().graphs();
-        if (graphs.isEmpty()) {
+    protected void execute(@Nonnull CommandContext context, @Nonnull Store<EntityStore> store,
+                           @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+        TalentGraph graph = api.registry().graphs().stream()
+                .min(Comparator.comparing(g -> g.id().toString()))
+                .orElse(null);
+        if (graph == null) {
             context.sendMessage(Message.raw("No talent graph registered."));
-            return CompletableFuture.completedFuture(null);
+            return;
         }
-        context.sendMessage(Message.raw(graphs.size() + " talent graph(s):"));
-        for (TalentGraph graph : graphs) {
-            context.sendMessage(Message.raw("  " + graph.displayName() + " (" + graph.id() + ")"));
-            for (Talent talent : graph.talents()) {
-                context.sendMessage(Message.raw("    - " + talent.displayName()
-                        + " [max rank " + talent.maxRank() + "]"));
-            }
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player == null) {
+            return;
         }
-        return CompletableFuture.completedFuture(null);
+        player.getPageManager().openCustomPage(ref, store, new TalentGraphPage(
+                playerRef, graph, layouts.layoutOf(graph), api.talentsOf(playerRef.getUuid())));
     }
 }

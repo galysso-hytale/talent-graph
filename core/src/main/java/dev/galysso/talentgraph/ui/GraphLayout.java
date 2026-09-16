@@ -10,10 +10,13 @@ import java.util.Map;
  * API: a graph is valid without one, see {@link AutoLayout}.
  *
  * @param positions top-left corner of every node, keyed by talent
+ * @param icons     icon asset path of the talents that declare one, e.g.
+ *                  {@code UI/Custom/Pages/TalentGraph/Icons/Cleave.png}
  * @param width     canvas width in pixels
  * @param height    canvas height in pixels
  */
-public record GraphLayout(Map<TalentId, Point> positions, int width, int height) {
+public record GraphLayout(Map<TalentId, Point> positions, Map<TalentId, String> icons,
+                          int width, int height) {
 
     /** Node size in pixels; nodes are square. */
     public static final int NODE_SIZE = 64;
@@ -22,6 +25,7 @@ public record GraphLayout(Map<TalentId, Point> positions, int width, int height)
 
     public GraphLayout {
         positions = Map.copyOf(positions);
+        icons = Map.copyOf(icons);
     }
 
     /**
@@ -37,7 +41,16 @@ public record GraphLayout(Map<TalentId, Point> positions, int width, int height)
             maxX = Math.max(maxX, p.x());
             maxY = Math.max(maxY, p.y());
         }
-        return new GraphLayout(positions, maxX + NODE_SIZE + MARGIN, maxY + NODE_SIZE + MARGIN);
+        return new GraphLayout(positions, Map.of(), maxX + NODE_SIZE + MARGIN, maxY + NODE_SIZE + MARGIN);
+    }
+
+    /**
+     * {@return a copy of this layout with the given icons}
+     *
+     * @param icons icon asset path per talent
+     */
+    public GraphLayout withIcons(Map<TalentId, String> icons) {
+        return new GraphLayout(positions, icons, width, height);
     }
 
     /**

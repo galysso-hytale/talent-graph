@@ -1,0 +1,76 @@
+$C = "../../Common.ui";
+
+@HeaderStyle = LabelStyle(
+  FontSize: 15,
+  VerticalAlignment: Center,
+  RenderUppercase: true,
+  TextColor: #b4c8c9,
+  FontName: "Secondary",
+  RenderBold: true,
+  LetterSpacing: 0.5
+);
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer {
+    // Parameter overrides must precede properties.
+    @CloseButton = true;
+    Anchor: (Height: 825, Width: 1070);
+
+    #Title {
+      Group {
+        LayoutMode: Center;
+
+        Label #PageTitle {
+          Style: (...@HeaderStyle, FontName: "Default");
+          Text: "Talents";
+        }
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Full: 9);
+
+      Group #Header {
+        LayoutMode: Left;
+        Anchor: (Height: 32);
+        Padding: (Horizontal: 12);
+
+        Label #GraphName {
+          Style: (...@HeaderStyle, TextColor: #89899f);
+          Text: "";
+        }
+
+        Group {
+          FlexWeight: 1;
+        }
+
+        Label #Points {
+          Style: (...@HeaderStyle, TextColor: #e8a93b);
+          Text: "";
+        }
+      }
+
+      // Two nested scrolling groups: the outer one scrolls vertically, the
+      // inner one horizontally. The canvas itself has no LayoutMode so its
+      // children are placed by their Anchor, in canvas pixels.
+      Group #Viewport {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Group #HViewport {
+          LayoutMode: LeftScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Group #Canvas {
+            Anchor: (Width: 800, Height: 600);
+            Background: (Color: #060b14(0.45));
+          }
+        }
+      }
+    }
+  }
+}

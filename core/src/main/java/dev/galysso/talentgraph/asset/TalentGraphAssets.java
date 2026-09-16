@@ -13,6 +13,7 @@ import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphBuilder;
 import dev.galysso.talentgraph.api.TalentId;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
+import dev.galysso.talentgraph.ui.AutoLayout;
 import dev.galysso.talentgraph.ui.GraphLayout;
 import dev.galysso.talentgraph.ui.GraphLayouts;
 
@@ -96,6 +97,7 @@ public final class TalentGraphAssets {
         String prefix = graphId.path() + '/';
         TalentGraphBuilder builder = TalentGraphBuilder.of(graphId, asset.getName());
         Map<TalentId, GraphLayout.Point> positions = new HashMap<>();
+        Map<TalentId, String> icons = new HashMap<>();
         boolean positioned = true;
         for (TalentDefinition def : asset.getTalents()) {
             TalentId id = talentId(asset.getNamespace(), prefix, def.getId());
@@ -111,6 +113,9 @@ public final class TalentGraphAssets {
             } else {
                 positioned = false;
             }
+            if (def.getIcon() != null) {
+                icons.put(id, def.getIcon());
+            }
         }
         TalentGraph graph = builder.build();
         TalentId previous = loaded.put(asset.getId(), graphId);
@@ -120,15 +125,17 @@ public final class TalentGraphAssets {
             layouts.remove(previous);
         }
         api.replaceGraph(graph);
+        GraphLayout layout;
         if (positioned) {
-            layouts.put(graphId, GraphLayout.of(positions));
+            layout = GraphLayout.of(positions);
         } else {
-            layouts.remove(graphId);
+            layout = AutoLayout.of(graph);
             if (!positions.isEmpty()) {
                 logger.at(Level.WARNING).log(
                         "Talent graph %s: some talents lack X/Y, using automatic layout for all", graphId);
             }
         }
+        layouts.put(graphId, layout.withIcons(icons));
         logger.at(Level.INFO).log("Talent graph %s loaded (%d talents)", graphId, graph.talents().size());
     }
 

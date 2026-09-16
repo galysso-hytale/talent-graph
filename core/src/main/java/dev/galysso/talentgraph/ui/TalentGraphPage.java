@@ -1,0 +1,275 @@
+package dev.galysso.talentgraph.ui;
+
+import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.KeyedCodec;
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
+import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.builder.EventData;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import dev.galysso.talentgraph.api.PlayerTalents;
+import dev.galysso.talentgraph.api.Talent;
+import dev.galysso.talentgraph.api.TalentException;
+import dev.galysso.talentgraph.api.TalentGraph;
+import dev.galysso.talentgraph.api.TalentId;
+
+import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The in-game view of one talent graph for one player.
+ *
+ * <p>The canvas holds, in order, one link group per talent (its incoming
+ * prerequisite links) and then one node per talent, so nodes always draw on
+ * top of links. Both are addressed by child index, which is why the talent
+ * order is fixed at construction. Unlocking refreshes only the node, its
+ * dependents and the link groups touching them.</p>
+ */
+public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPage.Event> {
+
+    private static final String PAGE_UI = "Pages/TalentGraph/TalentGraphPage.ui";
+    private static final String NODE_UI = "Pages/TalentGraph/Node.ui";
+    // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
+    private static final LinkRenderer LINKS = new SpriteLinkRenderer();
+    private static final String ACTION_CLOSE = "Close";
+
+    private final TalentGraph graph;
+    private final GraphLayout layout;
+    private final PlayerTalents talents;
+    /** Talents in canvas order; index {@code i} is the link group, {@code size + i} the node. */
+    private final List<Talent> order;
+    private final Map<TalentId, Integer> indexOf = new HashMap<>();
+    /** Talents that list each talent as a prerequisite. */
+    private final Map<TalentId, List<Talent>> dependents = new HashMap<>();
+
+    public TalentGraphPage(@Nonnull PlayerRef playerRef, TalentGraph graph, GraphLayout layout,
+                           PlayerTalents talents) {
+        super(playerRef, CustomPageLifetime.CanDismiss, Event.CODEC);
+        this.graph = graph;
+        this.layout = layout;
+        this.talents = talents;
+        this.order = new ArrayList<>(graph.talents());
+        order.sort(Comparator.comparing(t -> t.id().toString()));
+        for (int i = 0; i < order.size(); i++) {
+            Talent talent = order.get(i);
+            indexOf.put(talent.id(), i);
+            for (TalentId prerequisite : talent.prerequisites()) {
+                dependents.computeIfAbsent(prerequisite, k -> new ArrayList<>()).add(talent);
+            }
+        }
+    }
+
+    @Override
+    public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commands,
+                      @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
+        commands.append(PAGE_UI);
+        commands.set("#GraphName.Text", graph.displayName());
+        updatePoints(commands);
+        Anchor size = new Anchor();
+        size.setWidth(Value.of(layout.width()));
+        size.setHeight(Value.of(layout.height()));
+        commands.setObject("#Canvas.Anchor", size);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
+                EventData.of("Action", ACTION_CLOSE), false);
+
+        // Links first: an empty full-size group per talent, filled below.
+        for (int i = 0; i < order.size(); i++) {
+            commands.appendInline("#Canvas", "Group { }");
+        }
+        for (Talent talent : order) {
+            updateLinks(commands, talent);
+        }
+        for (Talent talent : order) {
+            String selector = nodeSelector(talent);
+            commands.append("#Canvas", NODE_UI);
+            commands.setObject(selector + ".Anchor", nodeAnchor(talent));
+            String icon = layout.icons().get(talent.id());
+            if (icon != null) {
+                commands.set(selector + " #Icon.AssetPath", icon);
+            }
+            updateNode(commands, talent);
+            EventData unlock = EventData.of("Unlock", talent.id().toString());
+            for (NodeState state : NodeState.values()) {
+                events.addEventBinding(CustomUIEventBindingType.Activating,
+                        selector + " #" + state.element(), unlock, false);
+            }
+        }
+    }
+
+    @Override
+    public void handleDataEvent(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                @Nonnull Event event) {
+        if (ACTION_CLOSE.equals(event.action)) {
+            close();
+            return;
+        }
+        if (event.unlock == null) {
+            return;
+        }
+        Talent talent;
+        try {
+            talent = graph.talent(TalentId.parse(event.unlock)).orElse(null);
+        } catch (IllegalArgumentException e) {
+            talent = null;
+        }
+        if (talent == null) {
+            return; // stale or forged event, nothing to do
+        }
+        try {
+            talents.unlock(talent.id());
+        } catch (TalentException e) {
+            playerRef.sendMessage(Message.raw(e.getMessage()));
+            return;
+        }
+        UICommandBuilder commands = new UICommandBuilder();
+        updatePoints(commands);
+        updateNode(commands, talent);
+        updateLinks(commands, talent);
+        for (Talent dependent : dependents.getOrDefault(talent.id(), List.of())) {
+            updateNode(commands, dependent);
+            updateLinks(commands, dependent);
+        }
+        sendUpdate(commands, null, false);
+    }
+
+    private void updatePoints(UICommandBuilder commands) {
+        commands.set("#Points.Text", talents.availablePoints() + " points");
+    }
+
+    private void updateNode(UICommandBuilder commands, Talent talent) {
+        String selector = nodeSelector(talent);
+        int rank = talents.rank(talent.id());
+        NodeState current = stateOf(talent, rank);
+        for (NodeState state : NodeState.values()) {
+            commands.set(selector + " #" + state.element() + ".Visible", state == current);
+        }
+        commands.set(selector + " #" + current.element() + ".TooltipText", tooltip(talent, rank, current));
+        commands.set(selector + " #Rank.Text", rank + "/" + talent.maxRank());
+    }
+
+    /** Clears and redraws every link ending at {@code talent}. */
+    private void updateLinks(UICommandBuilder commands, Talent talent) {
+        String selector = linkSelector(talent);
+        commands.clear(selector);
+        GraphLayout.Point to = centerOf(talent);
+        for (TalentId prerequisiteId : talent.prerequisites()) {
+            Talent prerequisite = graph.talent(prerequisiteId).orElse(null);
+            if (prerequisite == null) {
+                continue; // cross-graph prerequisite: not on this canvas
+            }
+            LINKS.render(commands, selector, centerOf(prerequisite), to, linkState(prerequisite, talent));
+        }
+    }
+
+    private NodeState stateOf(Talent talent, int rank) {
+        if (rank >= talent.maxRank()) {
+            return NodeState.MAXED;
+        }
+        if (rank > 0) {
+            return NodeState.UNLOCKED;
+        }
+        return prerequisitesMet(talent) ? NodeState.AVAILABLE : NodeState.LOCKED;
+    }
+
+    private LinkState linkState(Talent prerequisite, Talent talent) {
+        if (talents.rank(talent.id()) > 0) {
+            return LinkState.UNLOCKED;
+        }
+        return talents.rank(prerequisite.id()) > 0 ? LinkState.AVAILABLE : LinkState.LOCKED;
+    }
+
+    private boolean prerequisitesMet(Talent talent) {
+        for (TalentId prerequisite : talent.prerequisites()) {
+            if (talents.rank(prerequisite) < 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String tooltip(Talent talent, int rank, NodeState state) {
+        StringBuilder text = new StringBuilder(talent.displayName())
+                .append("\nRank ").append(rank).append('/').append(talent.maxRank());
+        switch (state) {
+            case MAXED -> text.append("\nMax rank reached");
+            case LOCKED -> {
+                text.append("\nRequires:");
+                for (TalentId prerequisite : talent.prerequisites()) {
+                    String name = graph.talent(prerequisite).map(Talent::displayName)
+                            .orElse(prerequisite.toString());
+                    text.append(' ').append(name);
+                }
+            }
+            case AVAILABLE, UNLOCKED -> text.append("\nNext rank: ")
+                    .append(talent.costOfRank(rank + 1)).append(" point(s)");
+        }
+        return text.toString();
+    }
+
+    private Anchor nodeAnchor(Talent talent) {
+        GraphLayout.Point p = position(talent);
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(p.x()));
+        anchor.setTop(Value.of(p.y()));
+        anchor.setWidth(Value.of(GraphLayout.NODE_SIZE));
+        anchor.setHeight(Value.of(GraphLayout.NODE_SIZE));
+        return anchor;
+    }
+
+    private GraphLayout.Point centerOf(Talent talent) {
+        GraphLayout.Point p = position(talent);
+        return new GraphLayout.Point(p.x() + GraphLayout.NODE_SIZE / 2, p.y() + GraphLayout.NODE_SIZE / 2);
+    }
+
+    private GraphLayout.Point position(Talent talent) {
+        // A layout registered before a hot reload may miss a freshly added talent.
+        return layout.positions().getOrDefault(talent.id(), new GraphLayout.Point(0, 0));
+    }
+
+    private String linkSelector(Talent talent) {
+        return "#Canvas[" + indexOf.get(talent.id()) + "]";
+    }
+
+    private String nodeSelector(Talent talent) {
+        return "#Canvas[" + (order.size() + indexOf.get(talent.id())) + "]";
+    }
+
+    /** Visual state of a node; {@link #element()} names its button in {@code Node.ui}. */
+    private enum NodeState {
+        LOCKED("Locked"), AVAILABLE("Available"), UNLOCKED("Unlocked"), MAXED("Maxed");
+
+        private final String element;
+
+        NodeState(String element) {
+            this.element = element;
+        }
+
+        String element() {
+            return element;
+        }
+    }
+
+    /** Data sent back by the client when a bound element is activated. */
+    public static final class Event {
+        static final BuilderCodec<Event> CODEC = BuilderCodec.builder(Event.class, Event::new)
+                .append(new KeyedCodec<>("Unlock", Codec.STRING, false), (e, v) -> e.unlock = v, e -> e.unlock).add()
+                .append(new KeyedCodec<>("Action", Codec.STRING, false), (e, v) -> e.action = v, e -> e.action).add()
+                .build();
+
+        private String unlock;
+        private String action;
+    }
+}
