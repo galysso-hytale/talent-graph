@@ -16,7 +16,7 @@ $C.@PageOverlay {
   $C.@DecoratedContainer {
     // Parameter overrides must precede properties.
     @CloseButton = true;
-    Anchor: (Height: 825, Width: 1070);
+    Anchor: (Height: 824, Width: 1070);
 
     #Title {
       Group {

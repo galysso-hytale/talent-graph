@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
@@ -51,6 +52,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
     private static final LinkRenderer LINKS = new SpriteLinkRenderer();
     private static final String ACTION_CLOSE = "Close";
+    private static final String COLOR_TITLE = "#f0f4ff";
+    private static final String COLOR_MUTED = "#96a9be";
+    private static final String COLOR_OK = "#5cc28a";
+    private static final String COLOR_BLOCKED = "#e05a5a";
 
     private final TalentGraph graph;
     private final GraphLayout layout;
@@ -197,10 +202,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         boolean actionable = affordable && state != NodeState.LOCKED;
         commands.set(selector + " #Action.Visible", actionable);
         // The overlay sits above the frame, so whichever is hit must carry the tooltip.
-        String tooltip = tooltip(talent, rank, state, affordable);
-        commands.set(selector + " #" + state.element() + ".TooltipText", tooltip);
+        Message tooltip = tooltip(talent, rank, state, affordable);
+        commands.set(selector + " #" + state.element() + ".TooltipTextSpans", tooltip);
         if (actionable) {
-            commands.set(selector + " #Action.TooltipText", tooltip);
+            commands.set(selector + " #Action.TooltipTextSpans", tooltip);
         }
     }
 
@@ -244,30 +249,43 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         return true;
     }
 
-    private String tooltip(Talent talent, int rank, NodeState state, boolean affordable) {
-        StringBuilder text = new StringBuilder(talent.displayName())
-                .append("\nRank ").append(rank).append('/').append(talent.maxRank());
-        switch (state) {
-            case MAXED -> text.append("\nMax rank reached");
+    /**
+     * Bold title, muted rank line for multi-rank talents, then one line that
+     * says what the player can do: red italics when nothing (and why), green
+     * when the talent is unlockable or already done.
+     */
+    private Message tooltip(Talent talent, int rank, NodeState state, boolean affordable) {
+        Message tip = Message.empty()
+                .insert(Message.raw(talent.displayName()).bold(true).color(COLOR_TITLE));
+        if (talent.maxRank() > 1) {
+            tip.insert(Message.raw("\nRank " + rank + "/" + talent.maxRank()).color(COLOR_MUTED));
+        }
+        return switch (state) {
+            case MAXED -> tip.insert(ok(talent.maxRank() > 1 ? "Max rank reached" : "Already unlocked"));
             case LOCKED -> {
-                text.append("\nRequires:");
+                List<String> names = new ArrayList<>();
                 for (TalentId prerequisite : talent.prerequisites()) {
-                    String name = graph.talent(prerequisite).map(Talent::displayName)
-                            .orElse(prerequisite.toString());
-                    text.append(' ').append(name);
+                    names.add(graph.talent(prerequisite).map(Talent::displayName)
+                            .orElse(prerequisite.toString()));
                 }
+                yield tip.insert(blocked("Requires " + String.join(", ", names)));
             }
             case AVAILABLE, UNLOCKED -> {
                 int cost = talent.costOfRank(rank + 1);
-                if (affordable) {
-                    text.append("\nNext rank: ").append(cost).append(" point(s)");
-                } else {
-                    text.append("\nNot enough points (").append(cost).append(" needed, ")
-                            .append(talents.availablePoints()).append(" available)");
-                }
+                yield tip.insert(affordable
+                        ? ok((rank > 0 ? "Click to upgrade" : "Click to unlock") + " (" + cost + " point(s))")
+                        : blocked("Not enough points (" + cost + " needed, "
+                                + talents.availablePoints() + " available)"));
             }
-        }
-        return text.toString();
+        };
+    }
+
+    private static Message ok(String text) {
+        return Message.raw("\n" + text).color(COLOR_OK);
+    }
+
+    private static Message blocked(String text) {
+        return Message.raw("\n" + text).italic(true).color(COLOR_BLOCKED);
     }
 
     private Anchor nodeAnchor(Talent talent) {
