@@ -15,9 +15,11 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * In-memory progression state for one player.
+ * Live progression state for one player.
  *
- * <p>TODO: persist this. Progression currently resets when the server stops.</p>
+ * <p>Persistence goes through {@link TalentProgressComponent}: the component
+ * is loaded into this object when the player enters a world and reads back
+ * from it while the player is online.</p>
  */
 final class PlayerTalentsImpl implements PlayerTalents {
 
@@ -121,6 +123,29 @@ final class PlayerTalentsImpl implements PlayerTalents {
             }
         }
         return talent.costOfRank(nextRank) <= availablePoints;
+    }
+
+    /**
+     * Replaces the whole state with a persisted snapshot.
+     *
+     * @param points the unspent points
+     * @param ranks  the rank reached in each talent, zero entries ignored
+     */
+    synchronized void load(int points, Map<TalentId, Integer> ranks) {
+        this.ranks.clear();
+        ranks.forEach((id, rank) -> {
+            if (rank > 0) {
+                this.ranks.put(id, rank);
+            }
+        });
+        this.availablePoints = Math.max(0, points);
+    }
+
+    /**
+     * {@return a copy of the ranks reached, for serialisation}
+     */
+    synchronized Map<TalentId, Integer> snapshot() {
+        return new HashMap<>(ranks);
     }
 
     /**

@@ -32,6 +32,13 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
 
     @Override
     public PlayerTalents talentsOf(UUID playerId) {
+        return progressionOf(playerId);
+    }
+
+    /**
+     * Typed variant of {@link #talentsOf(UUID)} for the persistence layer.
+     */
+    PlayerTalentsImpl progressionOf(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return players.computeIfAbsent(playerId,
                 id -> new PlayerTalentsImpl(id, registry, this::fireTalentUnlocked));
