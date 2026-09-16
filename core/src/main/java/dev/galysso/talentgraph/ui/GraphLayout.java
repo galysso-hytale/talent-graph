@@ -19,7 +19,7 @@ public record GraphLayout(Map<TalentId, Point> positions, Map<TalentId, String> 
                           int width, int height) {
 
     /** Node size in pixels; nodes are square. */
-    public static final int NODE_SIZE = 64;
+    public static final int NODE_SIZE = 72;
     /** Empty space kept around the outermost nodes. */
     public static final int MARGIN = 64;
 

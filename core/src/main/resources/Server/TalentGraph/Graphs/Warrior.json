@@ -4,6 +4,7 @@
         {
             "Id": "toughness",
             "Name": "Toughness",
+            "Icon": "Icons/ItemsGenerated/Armor_Iron_Chest.png",
             "MaxRank": 3,
             "Cost": [1, 2, 3],
             "X": 96,
@@ -12,6 +13,7 @@
         {
             "Id": "cleave",
             "Name": "Cleave",
+            "Icon": "Icons/ItemsGenerated/Weapon_Sword_Copper.png",
             "Cost": [2],
             "Requires": ["toughness"],
             "X": 420,

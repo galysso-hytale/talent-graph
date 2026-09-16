@@ -1,66 +1,99 @@
 $C = "../../Common.ui";
 $Sounds = "../../Sounds.ui";
 
-// One button per state, toggled through Visible by the server. Buttons carry
-// the tooltip because they are what the cursor actually hits.
-@StateButton = Button {
+// One frame per state, toggled through Visible by the server. Frames are
+// inert: no hover style, no sound, no event. They still carry the tooltip,
+// which is where the player reads why a talent cannot be unlocked. Backgrounds
+// are 9-slices so the node can be resized without redrawing the textures.
+@StateFrame = Button {
   Visible: false;
   TextTooltipShowDelay: 0.1;
   TextTooltipStyle: $C.@DefaultTextTooltipStyle;
 };
 
+@BadgeStyle = LabelStyle(
+  FontSize: 12,
+  RenderBold: true,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
 Group {
-  Anchor: (Width: 64, Height: 64);
+  Anchor: (Width: 72, Height: 72);
 
-  @StateButton #Locked {
+  @StateFrame #Locked {
+    Style: (Default: (Background: (TexturePath: "Node/Locked.png", Border: 8)));
+  }
+
+  @StateFrame #Available {
+    Style: (Default: (Background: (TexturePath: "Node/Available.png", Border: 8)));
+  }
+
+  @StateFrame #Unlocked {
+    Style: (Default: (Background: (TexturePath: "Node/Unlocked.png", Border: 8)));
+  }
+
+  @StateFrame #Maxed {
+    Style: (Default: (Background: (TexturePath: "Node/Maxed.png", Border: 8)));
+  }
+
+  // The only interactive element, shown solely when the talent can be
+  // unlocked right now. Transparent at rest so the state frame shows through.
+  Button #Action {
+    Visible: false;
+    TextTooltipShowDelay: 0.1;
+    TextTooltipStyle: $C.@DefaultTextTooltipStyle;
     Style: (
       Sounds: $Sounds.@ButtonsLight,
-      Default: (Background: "Node/Locked.png"),
-      Hovered: (Background: "Node/Locked_Hovered.png")
+      Hovered: (Background: (TexturePath: "Node/Action_Hovered.png", Border: 8))
     );
   }
 
-  @StateButton #Available {
-    Style: (
-      Sounds: $Sounds.@ButtonsLight,
-      Default: (Background: "Node/Available.png"),
-      Hovered: (Background: "Node/Available_Hovered.png")
-    );
-  }
-
-  @StateButton #Unlocked {
-    Style: (
-      Sounds: $Sounds.@ButtonsLight,
-      Default: (Background: "Node/Unlocked.png"),
-      Hovered: (Background: "Node/Unlocked_Hovered.png")
-    );
-  }
-
-  @StateButton #Maxed {
-    Style: (
-      Sounds: $Sounds.@ButtonsLight,
-      Default: (Background: "Node/Maxed.png"),
-      Hovered: (Background: "Node/Maxed_Hovered.png")
-    );
-  }
-
+  // Icon at the native 64×64 size of the game's item icons.
   Group {
     LayoutMode: CenterMiddle;
 
     AssetImage #Icon {
-      Anchor: (Width: 40, Height: 40);
+      Anchor: (Width: 64, Height: 64);
       FallbackTexturePath: "UI/Custom/Pages/TalentGraph/Icons/Missing.png";
     }
   }
 
+  // Darkens the icon of a locked talent.
+  Group #Dim {
+    Visible: false;
+    Background: (TexturePath: "Node/Dim.png", Border: 8);
+  }
+
+  // Cost of the next rank, green when affordable, red otherwise.
+  Group #Cost {
+    Anchor: (Right: -6, Top: -6, Width: 26, Height: 18);
+    Background: (TexturePath: "Node/Badge.png", Border: 6);
+    LayoutMode: CenterMiddle;
+
+    Label #CostOk {
+      Visible: false;
+      Style: (...@BadgeStyle, TextColor: #5cc28a);
+      Text: "";
+    }
+
+    Label #CostNo {
+      Visible: false;
+      Style: (...@BadgeStyle, TextColor: #e05a5a);
+      Text: "";
+    }
+  }
+
+  // Current rank, only shown for multi-rank talents.
   Group #RankBadge {
-    Anchor: (Right: -4, Bottom: -4, Width: 30, Height: 16);
-    Background: (Color: #060b14(0.85));
+    Visible: false;
+    Anchor: (Right: -6, Bottom: -6, Width: 30, Height: 16);
+    Background: (TexturePath: "Node/Badge.png", Border: 6);
     LayoutMode: CenterMiddle;
 
     Label #Rank {
-      Style: (FontSize: 11, RenderBold: true, TextColor: #d6e4ee, HorizontalAlignment: Center, VerticalAlignment: Center);
-      Text: "0/1";
+      Style: (...@BadgeStyle, FontSize: 11, TextColor: #d6e4ee);
+      Text: "";
     }
   }
 }

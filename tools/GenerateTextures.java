@@ -4,6 +4,7 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Line2D;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,21 +17,28 @@ import javax.imageio.ImageIO;
  *
  * <p>Output goes to {@code core/src/main/resources/Common/UI/Custom/Pages/TalentGraph/}:</p>
  * <ul>
- *   <li>{@code Lines/deg_000.png … deg_179.png}: 32×32 tiles with a 2 px white
+ *   <li>{@code Lines/deg_000.png … deg_179.png}: 48×48 tiles with a 2 px white
  *       anti-aliased line through the centre at the given angle (degrees,
- *       screen coordinates, y down). Chained every 24 px they draw a straight
+ *       screen coordinates, y down). Chained every 36 px they draw a straight
  *       link at any angle; the page tints them per link state.</li>
- *   <li>{@code Node/<State>.png} and {@code Node/<State>_Hovered.png}: 64×64
- *       node backgrounds, one per state. Replace freely, only the size matters.</li>
- *   <li>{@code Icons/Missing.png}: 40×40 fallback icon.</li>
+ *   <li>{@code Node/<State>.png}: 72×72 rounded squares, one per state, drawn
+ *       as 9-slices with an 8 px border so they survive resizing.
+ *       {@code Node/Action_Hovered.png} is the thicker ring shown when hovering
+ *       a talent that can be unlocked right now, {@code Node/Dim.png} darkens
+ *       the icon of a locked talent, {@code Node/Badge.png} backs the cost and
+ *       rank labels.</li>
+ *   <li>{@code Icons/Missing.png}: 64×64 fallback icon, the native size of the
+ *       game's item icons ({@code Icons/ItemsGenerated/*.png}).</li>
  * </ul>
  */
 public final class GenerateTextures {
 
-    static final int TILE = 32;
+    static final int TILE = 48;
     static final float LINE_WIDTH = 2f;
-    static final int NODE = 64;
-    static final int ICON = 40;
+    static final int NODE = 72;
+    static final int CORNER = 14;
+    static final int BADGE = 24;
+    static final int ICON = 64;
 
     public static void main(String[] args) throws IOException {
         Path root = Path.of("core/src/main/resources/Common/UI/Custom/Pages/TalentGraph");
@@ -61,27 +69,40 @@ public final class GenerateTextures {
 
     private static void nodes(Path dir) throws IOException {
         Files.createDirectories(dir);
-        node(dir, "Locked", new Color(0x2a, 0x33, 0x40), new Color(0x4a, 0x56, 0x66));
-        node(dir, "Available", new Color(0x1f, 0x3a, 0x5c), new Color(0x7a, 0x9c, 0xc6));
-        node(dir, "Unlocked", new Color(0x1e, 0x4d, 0x3a), new Color(0x5c, 0xc2, 0x8a));
-        node(dir, "Maxed", new Color(0x5a, 0x40, 0x14), new Color(0xe8, 0xa9, 0x3b));
+        Color fill = new Color(0x0d, 0x15, 0x22, 0xf0);
+        node(dir, "Locked", fill, new Color(0x4a, 0x56, 0x66));
+        node(dir, "Available", fill, new Color(0x7a, 0x9c, 0xc6));
+        node(dir, "Unlocked", fill, new Color(0x5c, 0xc2, 0x8a));
+        node(dir, "Maxed", fill, new Color(0xe8, 0xa9, 0x3b));
+        // Hover feedback of an unlockable node: only the ring, thicker and
+        // brighter, drawn over the state frame.
+        ImageIO.write(roundedSquare(NODE, CORNER, null, new Color(0xf0, 0xf4, 0xff), 5f),
+                "png", dir.resolve("Action_Hovered.png").toFile());
+        ImageIO.write(roundedSquare(NODE, CORNER, new Color(0x06, 0x0b, 0x14, 0x99), null, 0f),
+                "png", dir.resolve("Dim.png").toFile());
+        ImageIO.write(roundedSquare(BADGE, 10, new Color(0x06, 0x0b, 0x14, 0xe6),
+                new Color(0xff, 0xff, 0xff, 0x30), 1f), "png", dir.resolve("Badge.png").toFile());
     }
 
     private static void node(Path dir, String name, Color fill, Color ring) throws IOException {
-        ImageIO.write(disc(fill, ring, 3f), "png", dir.resolve(name + ".png").toFile());
-        ImageIO.write(disc(fill.brighter(), ring.brighter(), 4f), "png",
-                dir.resolve(name + "_Hovered.png").toFile());
+        ImageIO.write(roundedSquare(NODE, CORNER, fill, ring, 3f), "png",
+                dir.resolve(name + ".png").toFile());
     }
 
-    private static BufferedImage disc(Color fill, Color ring, float ringWidth) {
-        BufferedImage img = new BufferedImage(NODE, NODE, BufferedImage.TYPE_INT_ARGB);
+    private static BufferedImage roundedSquare(int size, int corner, Color fill, Color ring, float ringWidth) {
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = graphics(img);
-        int inset = 3;
-        g.setColor(fill);
-        g.fillOval(inset, inset, NODE - 2 * inset, NODE - 2 * inset);
-        g.setColor(ring);
-        g.setStroke(new BasicStroke(ringWidth));
-        g.drawOval(inset, inset, NODE - 2 * inset, NODE - 2 * inset);
+        float inset = ringWidth / 2f + 0.5f;
+        var shape = new RoundRectangle2D.Float(inset, inset, size - 2 * inset, size - 2 * inset, corner, corner);
+        if (fill != null) {
+            g.setColor(fill);
+            g.fill(shape);
+        }
+        if (ring != null) {
+            g.setColor(ring);
+            g.setStroke(new BasicStroke(ringWidth));
+            g.draw(shape);
+        }
         g.dispose();
         return img;
     }
@@ -91,7 +112,7 @@ public final class GenerateTextures {
         BufferedImage img = new BufferedImage(ICON, ICON, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = graphics(img);
         g.setColor(new Color(0xd6, 0xe4, 0xee, 0xb0));
-        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 44));
         var metrics = g.getFontMetrics();
         String text = "?";
         g.drawString(text, (ICON - metrics.stringWidth(text)) / 2f,

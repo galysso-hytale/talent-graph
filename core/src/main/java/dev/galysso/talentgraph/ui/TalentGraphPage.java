@@ -7,7 +7,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
@@ -26,8 +25,10 @@ import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The in-game view of one talent graph for one player.
@@ -35,8 +36,13 @@ import java.util.Map;
  * <p>The canvas holds, in order, one link group per talent (its incoming
  * prerequisite links) and then one node per talent, so nodes always draw on
  * top of links. Both are addressed by child index, which is why the talent
- * order is fixed at construction. Unlocking refreshes only the node, its
- * dependents and the link groups touching them.</p>
+ * order is fixed at construction. Unlocking refreshes the node, its dependents
+ * and the link groups touching them, plus the affordance of every other node
+ * since the point balance changed.</p>
+ *
+ * <p>Only a talent the player can unlock right now reacts to the cursor: its
+ * {@code #Action} overlay is the sole element bound to an event. Everything
+ * else is inert and explains itself through its tooltip.</p>
  */
 public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPage.Event> {
 
@@ -101,11 +107,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 commands.set(selector + " #Icon.AssetPath", icon);
             }
             updateNode(commands, talent);
-            EventData unlock = EventData.of("Unlock", talent.id().toString());
-            for (NodeState state : NodeState.values()) {
-                events.addEventBinding(CustomUIEventBindingType.Activating,
-                        selector + " #" + state.element(), unlock, false);
-            }
+            events.addEventBinding(CustomUIEventBindingType.Activating, selector + " #Action",
+                    EventData.of("Unlock", talent.id().toString()), false);
         }
     }
 
@@ -131,16 +134,26 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         try {
             talents.unlock(talent.id());
         } catch (TalentException e) {
-            playerRef.sendMessage(Message.raw(e.getMessage()));
+            // The overlay is only shown when unlocking is possible, so this is
+            // a click that raced a page update. The tooltip already explains.
             return;
         }
         UICommandBuilder commands = new UICommandBuilder();
         updatePoints(commands);
+        Set<TalentId> refreshed = new HashSet<>();
         updateNode(commands, talent);
         updateLinks(commands, talent);
+        refreshed.add(talent.id());
         for (Talent dependent : dependents.getOrDefault(talent.id(), List.of())) {
             updateNode(commands, dependent);
             updateLinks(commands, dependent);
+            refreshed.add(dependent.id());
+        }
+        // Spending points can flip the affordability of every other node.
+        for (Talent other : order) {
+            if (!refreshed.contains(other.id())) {
+                updateAffordance(commands, other, talents.rank(other.id()), stateOf(other, talents.rank(other.id())));
+            }
         }
         sendUpdate(commands, null, false);
     }
@@ -156,8 +169,39 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         for (NodeState state : NodeState.values()) {
             commands.set(selector + " #" + state.element() + ".Visible", state == current);
         }
-        commands.set(selector + " #" + current.element() + ".TooltipText", tooltip(talent, rank, current));
-        commands.set(selector + " #Rank.Text", rank + "/" + talent.maxRank());
+        commands.set(selector + " #Dim.Visible", current == NodeState.LOCKED);
+        boolean multiRank = talent.maxRank() > 1;
+        commands.set(selector + " #RankBadge.Visible", multiRank);
+        if (multiRank) {
+            commands.set(selector + " #Rank.Text", rank + "/" + talent.maxRank());
+        }
+        updateAffordance(commands, talent, rank, current);
+    }
+
+    /**
+     * Refreshes everything that depends on the point balance: the cost badge
+     * and its colour, the {@code #Action} overlay and the tooltip wording.
+     */
+    private void updateAffordance(UICommandBuilder commands, Talent talent, int rank, NodeState state) {
+        String selector = nodeSelector(talent);
+        boolean maxed = state == NodeState.MAXED;
+        commands.set(selector + " #Cost.Visible", !maxed);
+        boolean affordable = false;
+        if (!maxed) {
+            int cost = talent.costOfRank(rank + 1);
+            affordable = cost <= talents.availablePoints();
+            commands.set(selector + " #CostOk.Visible", affordable);
+            commands.set(selector + " #CostNo.Visible", !affordable);
+            commands.set(selector + " #" + (affordable ? "CostOk" : "CostNo") + ".Text", String.valueOf(cost));
+        }
+        boolean actionable = affordable && state != NodeState.LOCKED;
+        commands.set(selector + " #Action.Visible", actionable);
+        // The overlay sits above the frame, so whichever is hit must carry the tooltip.
+        String tooltip = tooltip(talent, rank, state, affordable);
+        commands.set(selector + " #" + state.element() + ".TooltipText", tooltip);
+        if (actionable) {
+            commands.set(selector + " #Action.TooltipText", tooltip);
+        }
     }
 
     /** Clears and redraws every link ending at {@code talent}. */
@@ -200,7 +244,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         return true;
     }
 
-    private String tooltip(Talent talent, int rank, NodeState state) {
+    private String tooltip(Talent talent, int rank, NodeState state, boolean affordable) {
         StringBuilder text = new StringBuilder(talent.displayName())
                 .append("\nRank ").append(rank).append('/').append(talent.maxRank());
         switch (state) {
@@ -213,8 +257,15 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                     text.append(' ').append(name);
                 }
             }
-            case AVAILABLE, UNLOCKED -> text.append("\nNext rank: ")
-                    .append(talent.costOfRank(rank + 1)).append(" point(s)");
+            case AVAILABLE, UNLOCKED -> {
+                int cost = talent.costOfRank(rank + 1);
+                if (affordable) {
+                    text.append("\nNext rank: ").append(cost).append(" point(s)");
+                } else {
+                    text.append("\nNot enough points (").append(cost).append(" needed, ")
+                            .append(talents.availablePoints()).append(" available)");
+                }
+            }
         }
         return text.toString();
     }

@@ -16,10 +16,11 @@ import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
 import java.util.Comparator;
+import java.util.Optional;
 
 /**
  * {@code /talents} opens the talent page on the first registered graph.
- * Sub-commands: {@code list}, {@code grant}.
+ * Sub-commands: {@code list}, {@code grant}, {@code reset}.
  */
 public class TalentsCommand extends AbstractPlayerCommand {
 
@@ -32,14 +33,20 @@ public class TalentsCommand extends AbstractPlayerCommand {
         this.layouts = layouts;
         addSubCommand(new ListSubCommand(api));
         addSubCommand(new GrantSubCommand(api));
+        addSubCommand(new ResetSubCommand(api));
+    }
+
+    /**
+     * {@return the graph shown by default: the first one by id}
+     */
+    static Optional<TalentGraph> defaultGraph(TalentGraphApi api) {
+        return api.registry().graphs().stream().min(Comparator.comparing(g -> g.id().toString()));
     }
 
     @Override
     protected void execute(@Nonnull CommandContext context, @Nonnull Store<EntityStore> store,
                            @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
-        TalentGraph graph = api.registry().graphs().stream()
-                .min(Comparator.comparing(g -> g.id().toString()))
-                .orElse(null);
+        TalentGraph graph = defaultGraph(api).orElse(null);
         if (graph == null) {
             context.sendMessage(Message.raw("No talent graph registered."));
             return;
