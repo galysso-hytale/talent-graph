@@ -1,0 +1,29 @@
+{
+    "Name": "Warrior",
+    "Talents": [
+        {
+            "Id": "toughness",
+            "Name": "Toughness",
+            "MaxRank": 3,
+            "Cost": [1, 2, 3],
+            "X": 96,
+            "Y": 96
+        },
+        {
+            "Id": "cleave",
+            "Name": "Cleave",
+            "Cost": [2],
+            "Requires": ["toughness"],
+            "X": 420,
+            "Y": 260
+        },
+        {
+            "Id": "berserk",
+            "Name": "Berserk",
+            "Cost": [3],
+            "Requires": ["cleave"],
+            "X": 420,
+            "Y": 520
+        }
+    ]
+}

@@ -1,7 +1,9 @@
 package dev.galysso.talentgraph.internal;
 
 import dev.galysso.talentgraph.api.PlayerTalents;
+import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphApi;
+import dev.galysso.talentgraph.api.TalentId;
 import dev.galysso.talentgraph.api.TalentListener;
 import dev.galysso.talentgraph.api.TalentRegistry;
 import dev.galysso.talentgraph.api.event.TalentUnlockedEvent;
@@ -43,6 +45,27 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
     @Override
     public boolean removeListener(TalentListener listener) {
         return listeners.remove(listener);
+    }
+
+    /**
+     * Registers a graph loaded from data, replacing a previous version with
+     * the same id on hot reload.
+     *
+     * @param graph the graph to add
+     * @throws dev.galysso.talentgraph.api.TalentException if one of its
+     *         talents already belongs to another graph
+     */
+    public void replaceGraph(TalentGraph graph) {
+        registry.replace(graph);
+    }
+
+    /**
+     * Drops a graph whose data file was removed.
+     *
+     * @param graphId the graph identifier
+     */
+    public void removeGraph(TalentId graphId) {
+        registry.remove(graphId);
     }
 
     /**

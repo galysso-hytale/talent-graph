@@ -45,6 +45,34 @@ final class TalentRegistryImpl implements TalentRegistry {
     }
 
     /**
+     * Registers a graph, replacing any previous version with the same id. Used
+     * when a data file is reloaded: the old graph is dropped first so its
+     * talents do not count as "already provided" by another graph.
+     *
+     * @param graph the graph to add
+     * @throws TalentException if one of its talents belongs to a different graph
+     */
+    void replace(TalentGraph graph) {
+        remove(graph.id());
+        register(graph);
+    }
+
+    /**
+     * Drops a graph and the talents it owns.
+     *
+     * @param graphId the graph identifier
+     * @return whether a graph was registered under that id
+     */
+    boolean remove(TalentId graphId) {
+        TalentGraph previous = graphs.remove(graphId);
+        if (previous == null) {
+            return false;
+        }
+        previous.talents().forEach(t -> owningGraph.remove(t.id(), previous));
+        return true;
+    }
+
+    /**
      * Resolves a talent across every registered graph.
      *
      * @param id the talent identifier

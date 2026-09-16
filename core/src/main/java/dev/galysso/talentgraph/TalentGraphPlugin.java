@@ -3,8 +3,10 @@ package dev.galysso.talentgraph;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
+import dev.galysso.talentgraph.asset.TalentGraphAssets;
 import dev.galysso.talentgraph.command.TalentsCommand;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
+import dev.galysso.talentgraph.ui.GraphLayouts;
 
 import javax.annotation.Nonnull;
 
@@ -14,6 +16,7 @@ import javax.annotation.Nonnull;
 public class TalentGraphPlugin extends JavaPlugin {
 
     private final TalentGraphApiImpl api = new TalentGraphApiImpl();
+    private final GraphLayouts layouts = new GraphLayouts();
 
     public TalentGraphPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -24,7 +27,7 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        api.registry().register(ExampleGraph.build());
+        new TalentGraphAssets(getLogger(), api, layouts).register(this);
         getCommandRegistry().registerCommand(
                 new TalentsCommand("talents", "List the registered talent graphs", api));
     }

@@ -10,7 +10,7 @@
     ],
     "Website": "https://github.com/galysso/talent-graph",
     "DisabledByDefault": false,
-    "IncludesAssetPack": false,
+    "IncludesAssetPack": true,
     "Dependencies": {
         
     },
