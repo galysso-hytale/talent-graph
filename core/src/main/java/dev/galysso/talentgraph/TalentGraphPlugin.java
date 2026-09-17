@@ -1,5 +1,6 @@
 package dev.galysso.talentgraph;
 
+import com.hypixel.hytale.server.core.io.adapter.PacketAdapters;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
@@ -9,6 +10,7 @@ import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.internal.TalentProgressComponent;
 import dev.galysso.talentgraph.internal.TalentProgressSystem;
 import dev.galysso.talentgraph.ui.GraphLayouts;
+import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
 
@@ -35,5 +37,6 @@ public class TalentGraphPlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, progressType));
         getCommandRegistry().registerCommand(
                 new TalentsCommand("talents", "Open the talent page", api, layouts));
+        PacketAdapters.registerInbound(TalentGraphPage.EVENT_FILTER);
     }
 }

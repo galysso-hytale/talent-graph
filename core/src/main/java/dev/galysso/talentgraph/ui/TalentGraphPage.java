@@ -6,13 +6,16 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.packets.interface_.CustomPage;
+import com.hypixel.hytale.protocol.packets.interface_.CustomPageEvent;
+import com.hypixel.hytale.protocol.packets.interface_.CustomPageEventType;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.entity.entities.player.pages.PageManager;
+import com.hypixel.hytale.server.core.io.adapter.PlayerPacketFilter;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -26,7 +29,6 @@ import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentId;
 
 import javax.annotation.Nonnull;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,9 +36,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 /**
@@ -50,13 +53,14 @@ import java.util.logging.Level;
  * buttons of the header; only the latter redraws everything.</p>
  *
  * <p>Moves are animated: a request sets a target and a server-side timer
- * glides the window towards it a few times per second, so the coarse steps
- * of the minimap grid read as one continuous motion. The server drops every
- * event of a page while one of its updates awaits the client's
- * acknowledgement ({@code PageManager.handleEvent}), so the glide keeps a
- * single update in flight and leaves a gap between two, or the cursor could
- * not steer it. Everything that touches the camera is synchronised, since
- * the timer runs off the world thread.</p>
+ * glides the window towards it once per world tick, so the coarse steps of
+ * the minimap grid read as one continuous motion. The server's page manager
+ * drops every event of a page received while one of its updates awaits the
+ * client's acknowledgement; at thirty updates a second that would make the
+ * page deaf to the cursor half of the time, so the events of open pages are
+ * taken from the wire before the page manager sees them (see
+ * {@link #EVENT_FILTER}). Everything that touches the camera is
+ * synchronised, since the timer runs off the world thread.</p>
  *
  * <p>Inside the content come, in order, one link group per talent that has
  * a prerequisite on this canvas, then one node per talent, so nodes always
@@ -99,14 +103,48 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private static final int DOT_SIZE = 4;
     /** Period of the glide timer, which checks whether an update may go out. */
     private static final long GLIDE_POLL_MILLIS = 16;
-    /** Shortest gap between two glide updates: the window left for events to get through. */
-    private static final long GLIDE_INTERVAL_NANOS = 40_000_000L;
+    /**
+     * Shortest gap between two glide updates. A step runs on the world
+     * thread, hence once per world tick (30 per second): anything under a
+     * tick means one update per tick, the gap being the rest of the tick.
+     */
+    private static final long GLIDE_INTERVAL_NANOS = 30_000_000L;
     /** Time constant of the ease-out: the remaining distance decays by e every τ. */
     private static final double GLIDE_TAU_NANOS = 80_000_000.0;
     /** Snap distance in screen pixels, which ends the glide (and its stream of updates). */
     private static final double GLIDE_SNAP = 2;
-    /** The count of unacknowledged updates of a page, kept private by the server. */
-    private static final Field PENDING_ACKNOWLEDGEMENTS = pendingAcknowledgementsField();
+
+    /** The pages open right now, by player, for {@link #EVENT_FILTER}. */
+    private static final Map<UUID, TalentGraphPage> OPEN = new ConcurrentHashMap<>();
+
+    /**
+     * Delivers the data events of open pages itself, on the world thread
+     * like the server would, and swallows the packet so that the page
+     * manager never applies its rule "no event while an update is
+     * unacknowledged". That rule guards against events sent against a stale
+     * page; here a stale unlock is already refused and a stale target is
+     * just a target, whereas a dropped hover is a window that stops
+     * following the cursor. Acknowledgements and dismissals go their usual
+     * way. To register once with {@code PacketAdapters.registerInbound}.
+     */
+    public static final PlayerPacketFilter EVENT_FILTER = (playerRef, packet) -> {
+        if (!(packet instanceof CustomPageEvent event) || event.type != CustomPageEventType.Data) {
+            return false;
+        }
+        TalentGraphPage page = OPEN.get(playerRef.getUuid());
+        Ref<EntityStore> ref = playerRef.getReference();
+        if (page == null || ref == null || !ref.isValid()) {
+            return false;
+        }
+        Store<EntityStore> store = ref.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            // Still the open page: it may have been closed since the packet came in.
+            if (ref.isValid() && OPEN.get(playerRef.getUuid()) == page) {
+                page.handleDataEvent(ref, store, event.data);
+            }
+        });
+        return true;
+    };
 
     /** Ranks shown as pips; beyond that the progress falls back to "3/10" text. */
     private static final int MAX_PIPS = 5;
@@ -155,7 +193,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** Measures of the current glide, logged on arrival. */
     private long glideStartNanos;
     private int glideSent;
-    private int glideSkipped;
 
     public TalentGraphPage(@Nonnull PlayerRef playerRef, TalentGraph graph, GraphLayout layout,
                            PlayerTalents talents) {
@@ -189,6 +226,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     @Override
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commands,
                       @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
+        OPEN.put(playerRef.getUuid(), this);
         commands.append(PAGE_UI);
         commands.set("#GraphName.Text", graph.displayName());
         updatePoints(commands);
@@ -258,9 +296,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             return;
         }
         GraphLayout.Point point = parsePoint(target);
-        if (point != null) {
-            glideTo(point);
+        if (point == null) {
+            return;
         }
+        glideTo(point);
     }
 
     /** The cursor left the minimap: the window finishes its way to the last cell entered. */
@@ -273,13 +312,15 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
 
     /** Sets the target of the glide and starts the timer if the window was at rest. */
     private void glideTo(GraphLayout.Point point) {
+        if (glide == null && camera.isAt(point.x(), point.y(), GLIDE_SNAP / camera.zoom())) {
+            return; // already there, nothing to animate
+        }
         targetX = point.x();
         targetY = point.y();
         if (glide == null) {
             long now = System.nanoTime();
             glideStartNanos = now;
             glideSent = 0;
-            glideSkipped = 0;
             // Let the first poll send right away.
             lastGlideSendNanos = now - GLIDE_INTERVAL_NANOS;
             glide = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(this::tick,
@@ -304,61 +345,35 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         if (glide == null || !ref.isValid()) {
             return; // dismissed between the poll and this step
         }
-        long now = System.nanoTime();
-        if (now - lastGlideSendNanos < GLIDE_INTERVAL_NANOS) {
+        Player player = ref.getStore().getComponent(ref, Player.getComponentType());
+        if (player == null) {
+            stopGlide();
             return;
         }
-        if (pendingAcknowledgements(ref) != 0) {
-            glideSkipped++;
+        long now = System.nanoTime();
+        if (now - lastGlideSendNanos < GLIDE_INTERVAL_NANOS) {
             return;
         }
         // The share of the remaining distance to cover depends on the time
         // elapsed, so a late tick does not slow the motion down.
         double fraction = 1 - Math.exp(-(now - lastGlideSendNanos) / GLIDE_TAU_NANOS);
-        boolean arrived = camera.approach(targetX, targetY, fraction, GLIDE_SNAP / camera.zoom());
+        boolean done = camera.approach(targetX, targetY, fraction, GLIDE_SNAP / camera.zoom());
         UICommandBuilder commands = new UICommandBuilder();
         placeContent(commands);
         updateMinimapWindow(commands);
-        sendUpdate(commands, null, false);
+        if (done && LOG_NAVIGATION) {
+            LOGGER.at(Level.INFO).log("glide: %d updates, %d ms", glideSent + 1, (now - glideStartNanos) / 1_000_000);
+        }
+        // Straight to the wire rather than through sendUpdate, which would
+        // queue behind this task and wait for the next tick's flush: the
+        // frames then come out at one regular tick apart.
+        player.getPageManager().updateCustomPage(new CustomPage(getClass().getName(), false, false, getLifetime(),
+                commands.getCommands(), UIEventBuilder.EMPTY_EVENT_BINDING_ARRAY));
+        playerRef.getPacketHandler().tryFlush();
         lastGlideSendNanos = now;
         glideSent++;
-        if (arrived) {
-            if (LOG_NAVIGATION) {
-                LOGGER.at(Level.INFO).log("glide: %d updates, %d polls waiting for the client, %d ms",
-                        glideSent, glideSkipped, (now - glideStartNanos) / 1_000_000);
-            }
+        if (done) {
             stopGlide();
-        }
-    }
-
-    /**
-     * How many updates of this page the client has not acknowledged yet;
-     * 0 when unknown. Read on the world thread.
-     */
-    private int pendingAcknowledgements(Ref<EntityStore> ref) {
-        if (PENDING_ACKNOWLEDGEMENTS == null) {
-            return 0;
-        }
-        Player player = ref.getStore().getComponent(ref, Player.getComponentType());
-        if (player == null) {
-            return 0;
-        }
-        try {
-            return ((AtomicInteger) PENDING_ACKNOWLEDGEMENTS.get(player.getPageManager())).get();
-        } catch (IllegalAccessException | ClassCastException e) {
-            return 0;
-        }
-    }
-
-    private static Field pendingAcknowledgementsField() {
-        try {
-            Field field = PageManager.class.getDeclaredField("customPageRequiredAcknowledgments");
-            field.setAccessible(true);
-            return field;
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.at(Level.WARNING).log("Cannot read the page acknowledgements of the server (%s): "
-                    + "the minimap glide will not wait for the client", e);
-            return null;
         }
     }
 
@@ -372,6 +387,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     @Override
     public synchronized void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         stopGlide();
+        OPEN.remove(playerRef.getUuid(), this);
     }
 
     private static GraphLayout.Point parsePoint(String text) {
