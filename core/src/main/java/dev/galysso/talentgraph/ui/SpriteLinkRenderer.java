@@ -30,7 +30,7 @@ import java.util.logging.Level;
  *
  * <p>All of this happens in canvas units; each tile is then projected through
  * the camera, which scales it below 100 % zoom (the client resamples the
- * texture) and skips it when it falls outside the window.</p>
+ * texture).</p>
  */
 public final class SpriteLinkRenderer implements LinkRenderer {
 
@@ -114,11 +114,8 @@ public final class SpriteLinkRenderer implements LinkRenderer {
         for (int k = firstTile; k <= lastTile; k++) {
             int left = originX + k * a - width / 2;
             int top = originY + k * b - height / 2;
-            String anchor = camera.projectMarkup(left, top, width, height);
-            if (anchor != null) {
-                builder.appendInline(selector, "Group { " + anchor
-                        + "; Background: (TexturePath: \"" + texture + "\", Color: " + state.color() + "); }");
-            }
+            builder.appendInline(selector, "Group { " + camera.projectMarkup(left, top, width, height)
+                    + "; Background: (TexturePath: \"" + texture + "\", Color: " + state.color() + "); }");
         }
     }
 

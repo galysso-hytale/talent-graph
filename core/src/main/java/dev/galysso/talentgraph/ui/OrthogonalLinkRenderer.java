@@ -28,10 +28,7 @@ public final class OrthogonalLinkRenderer implements LinkRenderer {
 
     private static void rectangle(UICommandBuilder builder, String selector, Camera camera,
                                   int left, int top, int width, int height, LinkState state) {
-        String anchor = camera.projectMarkup(left, top, width, height);
-        if (anchor != null) {
-            builder.appendInline(selector, "Group { " + anchor
-                    + "; Background: (Color: " + state.color() + "); }");
-        }
+        builder.appendInline(selector, "Group { " + camera.projectMarkup(left, top, width, height)
+                + "; Background: (Color: " + state.color() + "); }");
     }
 }

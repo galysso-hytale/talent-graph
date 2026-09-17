@@ -89,20 +89,31 @@ $C.@PageOverlay {
       }
 
       // The stage is the window on the canvas. Its size is fixed and known
-      // to the server (TalentGraphPage.VIEWPORT_*), which only emits what
-      // falls inside it: the client reports neither wheel nor cursor, so
-      // there is no scroll to read back. The canvas has no LayoutMode; its
-      // children are placed by their Anchor, in screen units.
+      // to the server (TalentGraphPage.VIEWPORT_*): the client reports
+      // neither wheel nor cursor, so there is no scroll to read back.
       Group #Stage {
         Anchor: (Top: 8, Width: 1582, Height: 864);
 
-        Group #Canvas {
-          Background: (Color: #060b14(0.45));
+        // A scrolling group with nothing to scroll: the only kind of group
+        // that clips its children. The canvas fills it exactly; the content
+        // inside is the whole graph drawn at the current zoom, which the
+        // server slides around by re-anchoring it. Neither has a LayoutMode:
+        // their children are placed by their Anchor alone.
+        Group #Viewport {
+          LayoutMode: TopScrolling;
+
+          Group #Canvas {
+            Anchor: (Width: 1582, Height: 864);
+            Background: (Color: #060b14(0.45));
+
+            Group #Graph {
+            }
+          }
         }
 
         // The whole graph at a glance, and the only way to move the window:
         // a grid of invisible buttons (appended by the server) covers it,
-        // each recentring the window on the point under it.
+        // each sending the window to the point under it.
         Group #Minimap {
           Anchor: (Right: 12, Bottom: 12, Width: 300, Height: 180);
           Background: (TexturePath: "Node/Badge.png", Border: 6);
@@ -133,8 +144,8 @@ $C.@PageOverlay {
         }
 
         // A ring of invisible buttons around the minimap: entering one means
-        // the cursor left the minimap, which drops a grabbed window. Wider
-        // on the canvas side so that a quick move cannot skip it.
+        // the cursor left the minimap, which ends follow mode. Wider on the
+        // canvas side so that a quick move cannot skip it.
         @Ring #RingTop {
           Anchor: (Right: 0, Bottom: 192, Width: 336, Height: 24);
         }

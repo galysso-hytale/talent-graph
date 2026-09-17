@@ -8,11 +8,14 @@ import com.hypixel.hytale.server.core.ui.Value;
  * screen units, placed over the canvas at one of a few zoom levels.
  *
  * <p>The client reports neither the wheel nor the cursor position, so the
- * window only ever moves through explicit requests: {@link #centerOn} from
- * the minimap and {@link #zoomIn}/{@link #zoomOut} from the header. Screen
- * coordinates are relative to the top-left corner of the window: a canvas
- * point {@code p} lands at {@code (p − origin) × zoom}, where the origin is
- * the canvas point under that corner.</p>
+ * window only ever moves through explicit requests: {@link #centerOn} and
+ * {@link #approach} from the minimap and {@link #zoomIn}/{@link #zoomOut}
+ * from the header. The whole canvas is drawn once per zoom level in
+ * <em>scaled</em> coordinates, relative to the top-left corner of the layout
+ * bounds: a canvas point {@code p} lands at {@code (p − bounds.min) × zoom}.
+ * Moving the window then only moves that drawing: {@link #contentAnchor}
+ * places it under the window so that the origin, the canvas point under the
+ * window's top-left corner, sits at its corner.</p>
  *
  * <p>The centre can reach any point of the layout bounds, so every node can
  * be brought to the middle, but never goes past them. On an axis where the
@@ -41,14 +44,6 @@ final class Camera {
         this.height = height;
         this.bounds = bounds;
         centerOn(bounds.minX() + bounds.width() / 2.0, bounds.minY() + bounds.height() / 2.0);
-    }
-
-    int width() {
-        return width;
-    }
-
-    int height() {
-        return height;
     }
 
     double zoom() {
@@ -90,8 +85,38 @@ final class Camera {
 
     /** Moves the window so that the canvas point {@code (x, y)} is at its centre, within bounds. */
     void centerOn(double x, double y) {
-        centerX = clamp(x, bounds.minX(), bounds.maxX(), width / zoom());
-        centerY = clamp(y, bounds.minY(), bounds.maxY(), height / zoom());
+        centerX = clampX(x);
+        centerY = clampY(y);
+    }
+
+    /**
+     * Moves the centre a fraction of the way towards the canvas point
+     * {@code (x, y)}, within bounds, and snaps onto it once closer than
+     * {@code snap} on both axes.
+     *
+     * @return whether the centre is now on the point
+     */
+    boolean approach(double x, double y, double fraction, double snap) {
+        double targetX = clampX(x);
+        double targetY = clampY(y);
+        double dx = targetX - centerX;
+        double dy = targetY - centerY;
+        if (Math.abs(dx) <= snap && Math.abs(dy) <= snap) {
+            centerX = targetX;
+            centerY = targetY;
+            return true;
+        }
+        centerX += dx * fraction;
+        centerY += dy * fraction;
+        return false;
+    }
+
+    private double clampX(double x) {
+        return clamp(x, bounds.minX(), bounds.maxX(), width / zoom());
+    }
+
+    private double clampY(double y) {
+        return clamp(y, bounds.minY(), bounds.maxY(), height / zoom());
     }
 
     private static double clamp(double value, int min, int max, double windowExtent) {
@@ -121,12 +146,14 @@ final class Camera {
         return centerY + height / (2 * zoom());
     }
 
-    int toScreenX(double canvasX) {
-        return (int) Math.round((canvasX - originX()) * zoom());
+    /** {@return a canvas x in scaled coordinates} */
+    int toScaledX(double canvasX) {
+        return (int) Math.round((canvasX - bounds.minX()) * zoom());
     }
 
-    int toScreenY(double canvasY) {
-        return (int) Math.round((canvasY - originY()) * zoom());
+    /** {@return a canvas y in scaled coordinates} */
+    int toScaledY(double canvasY) {
+        return (int) Math.round((canvasY - bounds.minY()) * zoom());
     }
 
     /** {@return a length in screen units} */
@@ -134,36 +161,33 @@ final class Camera {
         return (int) Math.round(canvasLength * zoom());
     }
 
-    /** Whether the canvas rectangle overlaps the window. */
-    boolean shows(int left, int top, int width, int height) {
-        return left < rightX() && left + width > originX() && top < bottomY() && top + height > originY();
+    /**
+     * The anchor of the scaled drawing of the canvas inside the window: its
+     * full size, offset so that the origin lands on the window's corner.
+     */
+    Anchor contentAnchor() {
+        return anchor(-toScaledX(originX()), -toScaledY(originY()),
+                scale(bounds.width()), scale(bounds.height()));
     }
 
     /**
-     * The anchor of a canvas rectangle in screen units, or null when the
-     * rectangle lies outside the window. Both edges are rounded separately
-     * so that adjacent rectangles stay adjacent.
+     * The anchor of a canvas rectangle in scaled coordinates. Both edges are
+     * rounded separately so that adjacent rectangles stay adjacent.
      */
     Anchor project(int left, int top, int width, int height) {
-        if (!shows(left, top, width, height)) {
-            return null;
-        }
-        int screenLeft = toScreenX(left);
-        int screenTop = toScreenY(top);
-        return anchor(screenLeft, screenTop, Math.max(1, toScreenX(left + width) - screenLeft),
-                Math.max(1, toScreenY(top + height) - screenTop));
+        int scaledLeft = toScaledX(left);
+        int scaledTop = toScaledY(top);
+        return anchor(scaledLeft, scaledTop, Math.max(1, toScaledX(left + width) - scaledLeft),
+                Math.max(1, toScaledY(top + height) - scaledTop));
     }
 
     /** Same as {@link #project(int, int, int, int)}, as inline markup. */
     String projectMarkup(int left, int top, int width, int height) {
-        if (!shows(left, top, width, height)) {
-            return null;
-        }
-        int screenLeft = toScreenX(left);
-        int screenTop = toScreenY(top);
-        return "Anchor: (Left: " + screenLeft + ", Top: " + screenTop
-                + ", Width: " + Math.max(1, toScreenX(left + width) - screenLeft)
-                + ", Height: " + Math.max(1, toScreenY(top + height) - screenTop) + ")";
+        int scaledLeft = toScaledX(left);
+        int scaledTop = toScaledY(top);
+        return "Anchor: (Left: " + scaledLeft + ", Top: " + scaledTop
+                + ", Width: " + Math.max(1, toScaledX(left + width) - scaledLeft)
+                + ", Height: " + Math.max(1, toScaledY(top + height) - scaledTop) + ")";
     }
 
     /** An anchor in screen units, as the client expects it. */
