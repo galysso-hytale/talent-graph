@@ -45,6 +45,9 @@ import javax.imageio.ImageIO;
  *   <li>{@code Icons/Missing.png}: 64×64 fallback icon, the native size of the
  *       game's item icons ({@code Icons/ItemsGenerated/*.png}).</li>
  * </ul>
+ *
+ * <p>The talent-point gem ({@code Node/Point.png}, {@code Node/PointLarge.png})
+ * is drawn by {@code tools/generate_point_icon.py} instead.</p>
  */
 public final class GenerateTextures {
 
@@ -58,8 +61,6 @@ public final class GenerateTextures {
     static final int NODE = 72;
     static final int CORNER = 14;
     static final int BADGE = 24;
-    static final int GEM = 8;
-    static final int GEM_LARGE = 12;
     static final int PIP = 8;
     static final int CHECK_WIDTH = 12;
     static final int CHECK_HEIGHT = 10;
@@ -191,36 +192,9 @@ public final class GenerateTextures {
                     new Color(0xff, 0xff, 0xff, 0x30), 1f, scale), "png",
                     dir.resolve("Badge" + suffix(scale) + ".png").toFile());
             ImageIO.write(check(scale), "png", dir.resolve("Check" + suffix(scale) + ".png").toFile());
-            ImageIO.write(gem(GEM, scale), "png", dir.resolve("Point" + suffix(scale) + ".png").toFile());
-            ImageIO.write(gem(GEM_LARGE, scale), "png", dir.resolve("PointLarge" + suffix(scale) + ".png").toFile());
             ImageIO.write(pip(true, scale), "png", dir.resolve("PipOn" + suffix(scale) + ".png").toFile());
             ImageIO.write(pip(false, scale), "png", dir.resolve("PipOff" + suffix(scale) + ".png").toFile());
         }
-    }
-
-    /** Talent-point gem (prices, header): a rhombus with a lit upper facet. */
-    private static BufferedImage gem(int size, int scale) {
-        BufferedImage img = new BufferedImage(size * scale, size * scale, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = graphics(img);
-        g.scale(scale, scale);
-        float mid = size / 2f;
-        var body = new Path2D.Float();
-        body.moveTo(mid, 0.5);
-        body.lineTo(size - 0.5, mid);
-        body.lineTo(mid, size - 0.5);
-        body.lineTo(0.5, mid);
-        body.closePath();
-        g.setColor(new Color(0xd6, 0xe4, 0xee));
-        g.fill(body);
-        var facet = new Path2D.Float();
-        facet.moveTo(mid, 0.5);
-        facet.lineTo(size - 0.5, mid);
-        facet.lineTo(0.5, mid);
-        facet.closePath();
-        g.setColor(new Color(0xff, 0xff, 0xff));
-        g.fill(facet);
-        g.dispose();
-        return img;
     }
 
     /** Rank pip: filled yellow once acquired, hollow grey otherwise, on the node fill. */
