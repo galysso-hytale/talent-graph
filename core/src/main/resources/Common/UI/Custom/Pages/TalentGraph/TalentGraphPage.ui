@@ -89,20 +89,19 @@ $C.@PageOverlay {
       Group #Stage {
         Anchor: (Top: 8, Width: 1582, Height: 864);
 
-        // A scrolling group with nothing to scroll: the only kind of group
-        // that clips its children. The canvas fills it exactly; the content
-        // inside is the whole graph drawn at the current zoom, which the
-        // server slides around by re-anchoring it. Neither has a LayoutMode:
-        // their children are placed by their Anchor alone.
-        Group #Viewport {
-          LayoutMode: TopScrolling;
+        // The canvas holds the whole graph drawn at the current zoom, which
+        // the server slides around by re-anchoring #Graph. Neither group has
+        // a LayoutMode: their children are placed by their Anchor alone.
+        // Nothing clips by itself (a scrolling group with nothing to scroll
+        // does not either): the mask, an opaque texture stretched over the
+        // canvas, is what cuts the graph at the edges, as MapPage.ui does
+        // with its vignette on #MapContainer.
+        Group #Canvas {
+          Anchor: (Width: 1582, Height: 864);
+          Background: (Color: #060b14(0.45));
+          MaskTexturePath: "Mask.png";
 
-          Group #Canvas {
-            Anchor: (Width: 1582, Height: 864);
-            Background: (Color: #060b14(0.45));
-
-            Group #Graph {
-            }
+          Group #Graph {
           }
         }
 
