@@ -51,6 +51,12 @@ $C.@PageOverlay {
           Style: (...@HeaderStyle, TextColor: #e8a93b);
           Text: "";
         }
+
+        // Talent-point gem, the same symbol as on the price badges.
+        Group {
+          Anchor: (Left: 6, Top: 10, Bottom: 10, Width: 12);
+          Background: (TexturePath: "Node/PointLarge.png");
+        }
       }
 
       // Two nested scrolling groups: the outer one scrolls vertically, the

@@ -7,9 +7,9 @@ public enum LinkState {
     /** The prerequisite itself is not unlocked yet. */
     LOCKED("#3a4656"),
     /** The prerequisite is met, the dependent talent can be unlocked. */
-    AVAILABLE("#7a9cc6"),
+    AVAILABLE("#6fa8dc"),
     /** The dependent talent has at least one rank. */
-    UNLOCKED("#5cc28a");
+    UNLOCKED("#3fa86f");
 
     private final String color;
 

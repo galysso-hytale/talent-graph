@@ -3,7 +3,9 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -56,6 +58,11 @@ public final class GenerateTextures {
     static final int NODE = 72;
     static final int CORNER = 14;
     static final int BADGE = 24;
+    static final int GEM = 8;
+    static final int GEM_LARGE = 12;
+    static final int PIP = 8;
+    static final int CHECK_WIDTH = 12;
+    static final int CHECK_HEIGHT = 10;
     static final int ICON = 64;
     /** Texel-per-unit scales to generate, with the file suffix of each. */
     static final int[] SCALES = {1, 2};
@@ -163,12 +170,17 @@ public final class GenerateTextures {
 
     private static void nodes(Path dir) throws IOException {
         Files.createDirectories(dir);
-        Color fill = new Color(0x0d, 0x15, 0x22, 0xf0);
+        // Opaque: the links must not show through the icons.
+        Color fill = new Color(0x0d, 0x15, 0x22);
+        // Ring colours chosen so that the states stay apart under red-green
+        // colour blindness: blue vs yellow is safe, and the yellow (partial)
+        // is much brighter than the green (complete) so that luminance alone
+        // still separates them.
         for (int scale : SCALES) {
             node(dir, "Locked", fill, new Color(0x4a, 0x56, 0x66), scale);
-            node(dir, "Available", fill, new Color(0x7a, 0x9c, 0xc6), scale);
-            node(dir, "Unlocked", fill, new Color(0x5c, 0xc2, 0x8a), scale);
-            node(dir, "Maxed", fill, new Color(0xe8, 0xa9, 0x3b), scale);
+            node(dir, "Available", fill, new Color(0x6f, 0xa8, 0xdc), scale);
+            node(dir, "Unlocked", fill, new Color(0xf2, 0xc9, 0x4c), scale);
+            node(dir, "Maxed", fill, new Color(0x3f, 0xa8, 0x6f), scale);
             // Hover feedback of an unlockable node: only the ring, thicker and
             // brighter, drawn over the state frame.
             ImageIO.write(roundedSquare(NODE, CORNER, null, new Color(0xf0, 0xf4, 0xff), 5f, scale),
@@ -178,7 +190,70 @@ public final class GenerateTextures {
             ImageIO.write(roundedSquare(BADGE, 10, new Color(0x06, 0x0b, 0x14, 0xe6),
                     new Color(0xff, 0xff, 0xff, 0x30), 1f, scale), "png",
                     dir.resolve("Badge" + suffix(scale) + ".png").toFile());
+            ImageIO.write(check(scale), "png", dir.resolve("Check" + suffix(scale) + ".png").toFile());
+            ImageIO.write(gem(GEM, scale), "png", dir.resolve("Point" + suffix(scale) + ".png").toFile());
+            ImageIO.write(gem(GEM_LARGE, scale), "png", dir.resolve("PointLarge" + suffix(scale) + ".png").toFile());
+            ImageIO.write(pip(true, scale), "png", dir.resolve("PipOn" + suffix(scale) + ".png").toFile());
+            ImageIO.write(pip(false, scale), "png", dir.resolve("PipOff" + suffix(scale) + ".png").toFile());
         }
+    }
+
+    /** Talent-point gem (prices, header): a rhombus with a lit upper facet. */
+    private static BufferedImage gem(int size, int scale) {
+        BufferedImage img = new BufferedImage(size * scale, size * scale, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = graphics(img);
+        g.scale(scale, scale);
+        float mid = size / 2f;
+        var body = new Path2D.Float();
+        body.moveTo(mid, 0.5);
+        body.lineTo(size - 0.5, mid);
+        body.lineTo(mid, size - 0.5);
+        body.lineTo(0.5, mid);
+        body.closePath();
+        g.setColor(new Color(0xd6, 0xe4, 0xee));
+        g.fill(body);
+        var facet = new Path2D.Float();
+        facet.moveTo(mid, 0.5);
+        facet.lineTo(size - 0.5, mid);
+        facet.lineTo(0.5, mid);
+        facet.closePath();
+        g.setColor(new Color(0xff, 0xff, 0xff));
+        g.fill(facet);
+        g.dispose();
+        return img;
+    }
+
+    /** Rank pip: filled yellow once acquired, hollow grey otherwise, on the node fill. */
+    private static BufferedImage pip(boolean on, int scale) {
+        BufferedImage img = new BufferedImage(PIP * scale, PIP * scale, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = graphics(img);
+        g.scale(scale, scale);
+        float ringWidth = 1.2f;
+        float inset = ringWidth / 2f + 0.5f / scale;
+        var disc = new Ellipse2D.Float(inset, inset, PIP - 2 * inset, PIP - 2 * inset);
+        g.setColor(on ? new Color(0xf2, 0xc9, 0x4c) : new Color(0x0d, 0x15, 0x22));
+        g.fill(disc);
+        g.setColor(on ? new Color(0x0d, 0x15, 0x22) : new Color(0x96, 0xa9, 0xbe));
+        g.setStroke(new BasicStroke(ringWidth));
+        g.draw(disc);
+        g.dispose();
+        return img;
+    }
+
+    /** Check mark shown in the rank badge of a complete talent (the game font has no U+2713). */
+    private static BufferedImage check(int scale) {
+        BufferedImage img = new BufferedImage(CHECK_WIDTH * scale, CHECK_HEIGHT * scale, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = graphics(img);
+        g.scale(scale, scale);
+        var path = new Path2D.Float();
+        path.moveTo(1.6, 5.4);
+        path.lineTo(4.8, 8.4);
+        path.lineTo(10.4, 1.6);
+        g.setColor(new Color(0xd6, 0xe4, 0xee));
+        g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(path);
+        g.dispose();
+        return img;
     }
 
     private static void node(Path dir, String name, Color fill, Color ring, int scale) throws IOException {

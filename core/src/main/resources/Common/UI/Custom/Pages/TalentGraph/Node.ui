@@ -65,35 +65,68 @@ Group {
     Background: (TexturePath: "Node/Dim.png", Border: 8);
   }
 
-  // Cost of the next rank, green when affordable, red otherwise.
+  // Price of the next rank: the number, white when affordable and red
+  // otherwise, followed by the talent-point gem.
   Group #Cost {
-    Anchor: (Right: -6, Top: -6, Width: 26, Height: 18);
+    Anchor: (Right: -6, Top: -6, Width: 34, Height: 18);
     Background: (TexturePath: "Node/Badge.png", Border: 6);
-    LayoutMode: CenterMiddle;
 
     Label #CostOk {
       Visible: false;
-      Style: (...@BadgeStyle, TextColor: #5cc28a);
+      Anchor: (Left: 3, Top: 0, Width: 18, Height: 18);
+      Style: (...@BadgeStyle, TextColor: #f0f4ff);
       Text: "";
     }
 
     Label #CostNo {
       Visible: false;
+      Anchor: (Left: 3, Top: 0, Width: 18, Height: 18);
       Style: (...@BadgeStyle, TextColor: #e05a5a);
       Text: "";
     }
+
+    Group {
+      Anchor: (Right: 4, Top: 5, Width: 8, Height: 8);
+      Background: (TexturePath: "Node/Point.png");
+    }
   }
 
-  // Current rank, only shown for multi-rank talents.
+  // Progress of a multi-rank talent, up to 5 ranks: a badge on the bottom
+  // edge holding one pip per rank, filled once acquired. The server anchors
+  // the badge and its pips so the row is centred whatever the rank count.
+  Group #Pips {
+    Visible: false;
+    Background: (TexturePath: "Node/Badge.png", Border: 6);
+    Group #Pip1On { Visible: false; Background: (TexturePath: "Node/PipOn.png"); }
+    Group #Pip1Off { Visible: false; Background: (TexturePath: "Node/PipOff.png"); }
+    Group #Pip2On { Visible: false; Background: (TexturePath: "Node/PipOn.png"); }
+    Group #Pip2Off { Visible: false; Background: (TexturePath: "Node/PipOff.png"); }
+    Group #Pip3On { Visible: false; Background: (TexturePath: "Node/PipOn.png"); }
+    Group #Pip3Off { Visible: false; Background: (TexturePath: "Node/PipOff.png"); }
+    Group #Pip4On { Visible: false; Background: (TexturePath: "Node/PipOn.png"); }
+    Group #Pip4Off { Visible: false; Background: (TexturePath: "Node/PipOff.png"); }
+    Group #Pip5On { Visible: false; Background: (TexturePath: "Node/PipOn.png"); }
+    Group #Pip5Off { Visible: false; Background: (TexturePath: "Node/PipOff.png"); }
+  }
+
+  // Bottom-centre badge: the check mark of a complete talent, or the rank as
+  // text when there are too many ranks for pips.
   Group #RankBadge {
     Visible: false;
-    Anchor: (Right: -6, Bottom: -6, Width: 30, Height: 16);
+    Anchor: (Left: 21, Bottom: -6, Width: 30, Height: 16);
     Background: (TexturePath: "Node/Badge.png", Border: 6);
     LayoutMode: CenterMiddle;
 
     Label #Rank {
+      Visible: false;
       Style: (...@BadgeStyle, FontSize: 11, TextColor: #d6e4ee);
       Text: "";
+    }
+
+    Group #Check {
+      Visible: false;
+      Anchor: (Width: 12, Height: 10);
+      Background: (TexturePath: "Node/Check.png");
     }
   }
 }

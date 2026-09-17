@@ -52,9 +52,15 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
     private static final LinkRenderer LINKS = new SpriteLinkRenderer();
     private static final String ACTION_CLOSE = "Close";
+    /** Ranks shown as pips; beyond that the progress falls back to "3/10" text. */
+    private static final int MAX_PIPS = 5;
+    private static final int PIP_SIZE = 8;
+    private static final int PIP_PITCH = 11;
+    private static final int PIP_PADDING = 5;
+    private static final int BADGE_HEIGHT = 16;
     private static final String COLOR_TITLE = "#f0f4ff";
     private static final String COLOR_MUTED = "#96a9be";
-    private static final String COLOR_OK = "#5cc28a";
+    private static final String COLOR_OK = "#3fa86f";
     private static final String COLOR_BLOCKED = "#e05a5a";
 
     private final TalentGraph graph;
@@ -107,6 +113,9 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             String selector = nodeSelector(talent);
             commands.append("#Canvas", NODE_UI);
             commands.setObject(selector + ".Anchor", nodeAnchor(talent));
+            if (hasPips(talent)) {
+                anchorPips(commands, selector, talent.maxRank());
+            }
             String icon = layout.icons().get(talent.id());
             if (icon != null) {
                 commands.set(selector + " #Icon.AssetPath", icon);
@@ -175,9 +184,22 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             commands.set(selector + " #" + state.element() + ".Visible", state == current);
         }
         commands.set(selector + " #Dim.Visible", current == NodeState.LOCKED);
-        boolean multiRank = talent.maxRank() > 1;
-        commands.set(selector + " #RankBadge.Visible", multiRank);
-        if (multiRank) {
+        // Progress is the non-colour cue of the state: pips (or "3/10" text)
+        // for a talent in progress, check mark once complete.
+        boolean maxed = current == NodeState.MAXED;
+        boolean pips = !maxed && hasPips(talent);
+        boolean text = !maxed && talent.maxRank() > 1 && !pips;
+        commands.set(selector + " #Pips.Visible", pips);
+        if (pips) {
+            for (int i = 1; i <= talent.maxRank(); i++) {
+                commands.set(selector + " #Pip" + i + "On.Visible", i <= rank);
+                commands.set(selector + " #Pip" + i + "Off.Visible", i > rank);
+            }
+        }
+        commands.set(selector + " #RankBadge.Visible", maxed || text);
+        commands.set(selector + " #Check.Visible", maxed);
+        commands.set(selector + " #Rank.Visible", text);
+        if (text) {
             commands.set(selector + " #Rank.Text", rank + "/" + talent.maxRank());
         }
         updateAffordance(commands, talent, rank, current);
@@ -288,14 +310,35 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         return Message.raw("\n" + text).italic(true).color(COLOR_BLOCKED);
     }
 
+    /** Whether the progress of {@code talent} is shown as pips rather than text. */
+    private static boolean hasPips(Talent talent) {
+        return talent.maxRank() > 1 && talent.maxRank() <= MAX_PIPS;
+    }
+
+    /** Centres the badge holding {@code count} pips on the bottom edge of the node. */
+    private static void anchorPips(UICommandBuilder commands, String selector, int count) {
+        int width = count * PIP_PITCH - (PIP_PITCH - PIP_SIZE) + 2 * PIP_PADDING;
+        commands.setObject(selector + " #Pips.Anchor", anchor((GraphLayout.NODE_SIZE - width) / 2,
+                GraphLayout.NODE_SIZE - BADGE_HEIGHT / 2, width, BADGE_HEIGHT));
+        for (int i = 1; i <= count; i++) {
+            Anchor anchor = anchor(PIP_PADDING + (i - 1) * PIP_PITCH, (BADGE_HEIGHT - PIP_SIZE) / 2, PIP_SIZE, PIP_SIZE);
+            commands.setObject(selector + " #Pip" + i + "On.Anchor", anchor);
+            commands.setObject(selector + " #Pip" + i + "Off.Anchor", anchor);
+        }
+    }
+
+    private static Anchor anchor(int left, int top, int width, int height) {
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(left));
+        anchor.setTop(Value.of(top));
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(height));
+        return anchor;
+    }
+
     private Anchor nodeAnchor(Talent talent) {
         GraphLayout.Point p = position(talent);
-        Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(p.x()));
-        anchor.setTop(Value.of(p.y()));
-        anchor.setWidth(Value.of(GraphLayout.NODE_SIZE));
-        anchor.setHeight(Value.of(GraphLayout.NODE_SIZE));
-        return anchor;
+        return anchor(p.x(), p.y(), GraphLayout.NODE_SIZE, GraphLayout.NODE_SIZE);
     }
 
     private GraphLayout.Point centerOf(Talent talent) {
