@@ -26,6 +26,23 @@
             "Requires": ["cleave"],
             "X": 420,
             "Y": 520
+        },
+        {
+            "Id": "warlord",
+            "Name": "Warlord",
+            "Cost": [4],
+            "Requires": ["berserk"],
+            "X": 1900,
+            "Y": 300
+        },
+        {
+            "Id": "titan",
+            "Name": "Titan",
+            "MaxRank": 2,
+            "Cost": [5],
+            "Requires": ["warlord"],
+            "X": 1900,
+            "Y": 1100
         }
     ]
 }

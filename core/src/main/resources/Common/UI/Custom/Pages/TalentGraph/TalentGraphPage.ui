@@ -10,13 +10,18 @@ $C = "../../Common.ui";
   LetterSpacing: 0.5
 );
 
+// Invisible button, see the ring around the minimap.
+@Ring = Button {
+  Style: (Default: (Background: #000000(0.0)));
+};
+
 $C.@PageOverlay {
   LayoutMode: Middle;
 
   $C.@DecoratedContainer {
     // Parameter overrides must precede properties.
     @CloseButton = true;
-    Anchor: (Height: 824, Width: 1070);
+    Anchor: (Height: 960, Width: 1600);
 
     #Title {
       Group {
@@ -47,6 +52,30 @@ $C.@PageOverlay {
           FlexWeight: 1;
         }
 
+        // Zoom by steps, centred in the header: two large targets beat a
+        // slider handle, and each step is one rebuild of the canvas.
+        $C.@SmallSecondaryTextButton #ZoomOut {
+          @Text = "-";
+          @Anchor = Anchor(Width: 32);
+          Padding: (Horizontal: 0);
+        }
+
+        Label #ZoomLevel {
+          Anchor: (Width: 56);
+          Style: (...@HeaderStyle, TextColor: #89899f, HorizontalAlignment: Center);
+          Text: "100 %";
+        }
+
+        $C.@SmallSecondaryTextButton #ZoomIn {
+          @Text = "+";
+          @Anchor = Anchor(Width: 32);
+          Padding: (Horizontal: 0);
+        }
+
+        Group {
+          FlexWeight: 1;
+        }
+
         Label #Points {
           Style: (...@HeaderStyle, TextColor: #e8a93b);
           Text: "";
@@ -59,22 +88,64 @@ $C.@PageOverlay {
         }
       }
 
-      // Two nested scrolling groups: the outer one scrolls vertically, the
-      // inner one horizontally. The canvas itself has no LayoutMode so its
-      // children are placed by their Anchor, in canvas pixels.
-      Group #Viewport {
-        FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      // The stage is the window on the canvas. Its size is fixed and known
+      // to the server (TalentGraphPage.VIEWPORT_*), which only emits what
+      // falls inside it: the client reports neither wheel nor cursor, so
+      // there is no scroll to read back. The canvas has no LayoutMode; its
+      // children are placed by their Anchor, in screen units.
+      Group #Stage {
+        Anchor: (Top: 8, Width: 1582, Height: 864);
 
-        Group #HViewport {
-          LayoutMode: LeftScrolling;
-          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Group #Canvas {
+          Background: (Color: #060b14(0.45));
+        }
 
-          Group #Canvas {
-            Anchor: (Width: 800, Height: 600);
-            Background: (Color: #060b14(0.45));
+        // The whole graph at a glance, and the only way to move the window:
+        // a grid of invisible buttons (appended by the server) covers it,
+        // each recentring the window on the point under it.
+        Group #Minimap {
+          Anchor: (Right: 12, Bottom: 12, Width: 300, Height: 180);
+          Background: (TexturePath: "Node/Badge.png", Border: 6);
+
+          Group #MinimapDots {
           }
+
+          // The rectangle of the window: a faint fill and a 1-unit outline,
+          // anchored by the server at each move.
+          Group #WindowFill {
+            Background: (Color: #ffffff(0.06));
+          }
+          Group #WindowTop {
+            Background: (Color: #f0f4ff(0.75));
+          }
+          Group #WindowBottom {
+            Background: (Color: #f0f4ff(0.75));
+          }
+          Group #WindowLeft {
+            Background: (Color: #f0f4ff(0.75));
+          }
+          Group #WindowRight {
+            Background: (Color: #f0f4ff(0.75));
+          }
+
+          Group #MinimapGrid {
+          }
+        }
+
+        // A ring of invisible buttons around the minimap: entering one means
+        // the cursor left the minimap, which drops a grabbed window. Wider
+        // on the canvas side so that a quick move cannot skip it.
+        @Ring #RingTop {
+          Anchor: (Right: 0, Bottom: 192, Width: 336, Height: 24);
+        }
+        @Ring #RingLeft {
+          Anchor: (Right: 312, Bottom: 0, Width: 24, Height: 192);
+        }
+        @Ring #RingBottom {
+          Anchor: (Right: 0, Bottom: 0, Width: 312, Height: 12);
+        }
+        @Ring #RingRight {
+          Anchor: (Right: 0, Bottom: 12, Width: 12, Height: 180);
         }
       }
     }

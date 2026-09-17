@@ -27,6 +27,10 @@ import java.util.logging.Level;
  * link is drawn along the nearest available direction through the midpoint of
  * the two node centres: the angular error moves both ends sideways by at most
  * {@code L/2 · sin(0.41°)}, under the nodes. Tiles are tinted per state.</p>
+ *
+ * <p>All of this happens in canvas units; each tile is then projected through
+ * the camera, which scales it below 100 % zoom (the client resamples the
+ * texture) and skips it when it falls outside the window.</p>
  */
 public final class SpriteLinkRenderer implements LinkRenderer {
 
@@ -59,7 +63,7 @@ public final class SpriteLinkRenderer implements LinkRenderer {
     private static final Direction[] DIRECTIONS = loadDirections();
 
     @Override
-    public void render(UICommandBuilder builder, String selector,
+    public void render(UICommandBuilder builder, String selector, Camera camera,
                        GraphLayout.Point from, GraphLayout.Point to, LinkState state) {
         int dx = to.x() - from.x();
         int dy = to.y() - from.y();
@@ -110,9 +114,11 @@ public final class SpriteLinkRenderer implements LinkRenderer {
         for (int k = firstTile; k <= lastTile; k++) {
             int left = originX + k * a - width / 2;
             int top = originY + k * b - height / 2;
-            builder.appendInline(selector, "Group { Anchor: (Left: " + left + ", Top: " + top
-                    + ", Width: " + width + ", Height: " + height
-                    + "); Background: (TexturePath: \"" + texture + "\", Color: " + state.color() + "); }");
+            String anchor = camera.projectMarkup(left, top, width, height);
+            if (anchor != null) {
+                builder.appendInline(selector, "Group { " + anchor
+                        + "; Background: (TexturePath: \"" + texture + "\", Color: " + state.color() + "); }");
+            }
         }
     }
 

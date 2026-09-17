@@ -16,6 +16,7 @@ import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.ui.AutoLayout;
 import dev.galysso.talentgraph.ui.GraphLayout;
 import dev.galysso.talentgraph.ui.GraphLayouts;
+import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -136,6 +137,13 @@ public final class TalentGraphAssets {
             }
         }
         layouts.put(graphId, layout.withIcons(icons));
+        GraphLayout.Bounds bounds = layout.bounds();
+        if (bounds.width() > TalentGraphPage.MAX_CANVAS_WIDTH || bounds.height() > TalentGraphPage.MAX_CANVAS_HEIGHT) {
+            logger.at(Level.WARNING).log(
+                    "Talent graph %s spans %dx%d canvas units, more than the %dx%d visible at the widest zoom: "
+                            + "players will never see it whole", graphId, bounds.width(), bounds.height(),
+                    TalentGraphPage.MAX_CANVAS_WIDTH, TalentGraphPage.MAX_CANVAS_HEIGHT);
+        }
         logger.at(Level.INFO).log("Talent graph %s loaded (%d talents)", graphId, graph.talents().size());
     }
 
