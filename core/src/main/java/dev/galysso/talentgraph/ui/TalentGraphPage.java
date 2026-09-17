@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.PageManager;
 import com.hypixel.hytale.server.core.io.adapter.PlayerPacketFilter;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
@@ -53,8 +54,9 @@ import java.util.logging.Level;
  * buttons of the header; only the latter redraws everything.</p>
  *
  * <p>Moves are animated: a request sets a target and a server-side timer
- * glides the window towards it once per world tick, so the coarse steps of
- * the minimap grid read as one continuous motion. The server's page manager
+ * glides the window towards it sixty times a second, straight from the timer
+ * thread to the wire, so the coarse steps of the minimap grid read as one
+ * continuous motion. The server's page manager
  * drops every event of a page received while one of its updates awaits the
  * client's acknowledgement; at thirty updates a second that would make the
  * page deaf to the cursor half of the time, so the events of open pages are
@@ -81,8 +83,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
     private static final LinkRenderer LINKS = new SpriteLinkRenderer();
     private static final String ACTION_CLOSE = "Close";
-    /** Logs the minimap events, to learn how the client sequences them. */
-    private static final boolean LOG_NAVIGATION = true;
+    /** Logs the minimap clicks, a debugging aid. */
+    private static final boolean LOG_NAVIGATION = false;
 
     /** Size of the canvas window in screen units; must match {@code #Stage} in the page markup. */
     static final int VIEWPORT_WIDTH = 1582;
@@ -101,18 +103,12 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** Side of the invisible buttons tiling the minimap, i.e. its click precision. */
     private static final int MINIMAP_CELL = 6;
     private static final int DOT_SIZE = 4;
-    /** Period of the glide timer, which checks whether an update may go out. */
-    private static final long GLIDE_POLL_MILLIS = 16;
-    /**
-     * Shortest gap between two glide updates. A step runs on the world
-     * thread, hence once per world tick (30 per second): anything under a
-     * tick means one update per tick, the gap being the rest of the tick.
-     */
-    private static final long GLIDE_INTERVAL_NANOS = 30_000_000L;
+    /** Period of the glide timer, i.e. of the frames it sends. */
+    private static final long GLIDE_FRAME_MILLIS = 16;
     /** Time constant of the ease-out: the remaining distance decays by e every τ. */
     private static final double GLIDE_TAU_NANOS = 80_000_000.0;
     /** Snap distance in screen pixels, which ends the glide (and its stream of updates). */
-    private static final double GLIDE_SNAP = 2;
+    private static final double GLIDE_SNAP = 1;
 
     /** The pages open right now, by player, for {@link #EVENT_FILTER}. */
     private static final Map<UUID, TalentGraphPage> OPEN = new ConcurrentHashMap<>();
@@ -167,6 +163,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** Talents that list each talent as a prerequisite. */
     private final Map<TalentId, List<Talent>> dependents = new HashMap<>();
     private final Camera camera;
+    /** Whether the graph can overflow the window at all; when not, the minimap never exists. */
+    private final boolean pannable;
     /** Canvas units to minimap units. */
     private final double minimapScale;
     /** Where the canvas origin lands on the minimap, so the graph is centred in it. */
@@ -179,20 +177,20 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
 
     /**
      * Follow mode: the window follows the cursor over the minimap. A right
-     * click toggles it, a left click or leaving the minimap ends it. Holding
-     * the button cannot do it: the client captures the pointer on the pressed
+     * click toggles it, a left click ends it; leaving the minimap merely
+     * pauses it, the window stays until the cursor comes back. Holding the
+     * button cannot do it: the client captures the pointer on the pressed
      * button and no other cell sees the cursor until it is released.
      */
     private boolean following;
     /** The canvas point the window is gliding to; meaningful while {@link #glide} runs. */
     private double targetX;
     private double targetY;
+    /** The page manager of the player, captured on the world thread for the glide timer. */
+    private PageManager pages;
     /** The running glide timer, or null when the window is at rest. */
     private ScheduledFuture<?> glide;
     private long lastGlideSendNanos;
-    /** Measures of the current glide, logged on arrival. */
-    private long glideStartNanos;
-    private int glideSent;
 
     public TalentGraphPage(@Nonnull PlayerRef playerRef, TalentGraph graph, GraphLayout layout,
                            PlayerTalents talents) {
@@ -209,6 +207,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         }
         GraphLayout.Bounds bounds = layout.bounds();
         this.camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, bounds);
+        this.pannable = bounds.width() > VIEWPORT_WIDTH || bounds.height() > VIEWPORT_HEIGHT;
         this.minimapScale = Math.min((double) (MINIMAP_WIDTH - 2 * MINIMAP_PADDING) / bounds.width(),
                 (double) (MINIMAP_HEIGHT - 2 * MINIMAP_PADDING) / bounds.height());
         this.minimapLeft = (MINIMAP_WIDTH - bounds.width() * minimapScale) / 2;
@@ -227,6 +226,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commands,
                       @Nonnull UIEventBuilder events, @Nonnull Store<EntityStore> store) {
         OPEN.put(playerRef.getUuid(), this);
+        pages = store.getComponent(ref, Player.getComponentType()).getPageManager();
         commands.append(PAGE_UI);
         commands.set("#GraphName.Text", graph.displayName());
         updatePoints(commands);
@@ -236,9 +236,11 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 EventData.of("Zoom", "in"), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#ZoomOut",
                 EventData.of("Zoom", "out"), false);
-        buildMinimap(commands, events);
+        if (pannable) {
+            buildMinimap(commands, events);
+            updateMinimapWindow(commands);
+        }
         updateZoomControls(commands);
-        updateMinimapWindow(commands);
         renderCanvas(commands, events);
     }
 
@@ -257,8 +259,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             pan(event.toggle, true);
         } else if (event.enter != null) {
             enter(event.enter);
-        } else if (event.drop != null) {
-            drop();
         }
     }
 
@@ -302,14 +302,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         glideTo(point);
     }
 
-    /** The cursor left the minimap: the window finishes its way to the last cell entered. */
-    private synchronized void drop() {
-        if (LOG_NAVIGATION) {
-            LOGGER.at(Level.INFO).log("minimap: left (following=%b)", following);
-        }
-        following = false;
-    }
-
     /** Sets the target of the glide and starts the timer if the window was at rest. */
     private void glideTo(GraphLayout.Point point) {
         if (glide == null && camera.isAt(point.x(), point.y(), GLIDE_SNAP / camera.zoom())) {
@@ -318,42 +310,28 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         targetX = point.x();
         targetY = point.y();
         if (glide == null) {
-            long now = System.nanoTime();
-            glideStartNanos = now;
-            glideSent = 0;
-            // Let the first poll send right away.
-            lastGlideSendNanos = now - GLIDE_INTERVAL_NANOS;
+            // As if a frame had just gone out: the first one covers a normal step.
+            lastGlideSendNanos = System.nanoTime() - GLIDE_FRAME_MILLIS * 1_000_000L;
             glide = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(this::tick,
-                    0, GLIDE_POLL_MILLIS, TimeUnit.MILLISECONDS);
+                    0, GLIDE_FRAME_MILLIS, TimeUnit.MILLISECONDS);
         }
     }
 
-    /** A poll of the glide timer: hops onto the world thread, the only one allowed to look at the player. */
-    private void tick() {
-        Ref<EntityStore> ref = playerRef.getReference();
-        if (ref == null) {
-            synchronized (this) {
-                stopGlide();
-            }
-            return;
+    /**
+     * One frame of the glide, on the timer thread; stops the timer on
+     * arrival. Nothing here needs the world thread: the page manager was
+     * captured on it, and counting an update then writing a packet are
+     * both thread-safe.
+     */
+    private synchronized void tick() {
+        if (glide == null) {
+            return; // dismissed between the last frame and the cancellation
         }
-        ref.getStore().getExternalData().getWorld().execute(() -> step(ref));
-    }
-
-    /** One step of the glide, if the client is ready for it; stops the timer on arrival. */
-    private synchronized void step(Ref<EntityStore> ref) {
-        if (glide == null || !ref.isValid()) {
-            return; // dismissed between the poll and this step
-        }
-        Player player = ref.getStore().getComponent(ref, Player.getComponentType());
-        if (player == null) {
+        if (playerRef.getReference() == null) {
             stopGlide();
             return;
         }
         long now = System.nanoTime();
-        if (now - lastGlideSendNanos < GLIDE_INTERVAL_NANOS) {
-            return;
-        }
         // The share of the remaining distance to cover depends on the time
         // elapsed, so a late tick does not slow the motion down.
         double fraction = 1 - Math.exp(-(now - lastGlideSendNanos) / GLIDE_TAU_NANOS);
@@ -361,17 +339,12 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         UICommandBuilder commands = new UICommandBuilder();
         placeContent(commands);
         updateMinimapWindow(commands);
-        if (done && LOG_NAVIGATION) {
-            LOGGER.at(Level.INFO).log("glide: %d updates, %d ms", glideSent + 1, (now - glideStartNanos) / 1_000_000);
-        }
         // Straight to the wire rather than through sendUpdate, which would
-        // queue behind this task and wait for the next tick's flush: the
-        // frames then come out at one regular tick apart.
-        player.getPageManager().updateCustomPage(new CustomPage(getClass().getName(), false, false, getLifetime(),
+        // wait for the world thread and its once-a-tick flush.
+        pages.updateCustomPage(new CustomPage(getClass().getName(), false, false, getLifetime(),
                 commands.getCommands(), UIEventBuilder.EMPTY_EVENT_BINDING_ARRAY));
         playerRef.getPacketHandler().tryFlush();
         lastGlideSendNanos = now;
-        glideSent++;
         if (done) {
             stopGlide();
         }
@@ -516,10 +489,12 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         commands.set("#Points.Text", talents.availablePoints() + " points");
     }
 
+    /** Refreshes what depends on the zoom level: its controls, and the minimap that a graph fitting whole does not need. */
     private void updateZoomControls(UICommandBuilder commands) {
         commands.set("#ZoomLevel.Text", camera.zoomPercent() + " %");
         commands.set("#ZoomIn.Disabled", !camera.canZoomIn());
         commands.set("#ZoomOut.Disabled", !camera.canZoomOut());
+        commands.set("#Minimap.Visible", pannable && !camera.showsAll());
     }
 
     /** Refreshes the state of a node. */
@@ -629,11 +604,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 events.addEventBinding(CustomUIEventBindingType.RightClicking, selector, EventData.of("Follow", target), false);
                 events.addEventBinding(CustomUIEventBindingType.MouseEntered, selector, EventData.of("Enter", target), false);
             }
-        }
-        // Leaving the minimap: the client never fires MouseExited for us, so a
-        // ring of buttons around it reports the cursor coming out instead.
-        for (String ring : new String[] {"#RingTop", "#RingLeft", "#RingBottom", "#RingRight"}) {
-            events.addEventBinding(CustomUIEventBindingType.MouseEntered, ring, EventData.of("Drop", "1"), false);
         }
     }
 
@@ -819,7 +789,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 .append(new KeyedCodec<>("Pan", Codec.STRING, false), (e, v) -> e.pan = v, e -> e.pan).add()
                 .append(new KeyedCodec<>("Follow", Codec.STRING, false), (e, v) -> e.toggle = v, e -> e.toggle).add()
                 .append(new KeyedCodec<>("Enter", Codec.STRING, false), (e, v) -> e.enter = v, e -> e.enter).add()
-                .append(new KeyedCodec<>("Drop", Codec.STRING, false), (e, v) -> e.drop = v, e -> e.drop).add()
                 .build();
 
         private String unlock;
@@ -832,6 +801,5 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         private String toggle;
         /** Canvas point under the hovered minimap cell, as {@code "x,y"}. */
         private String enter;
-        private String drop;
     }
 }

@@ -111,6 +111,11 @@ final class Camera {
         return false;
     }
 
+    /** Whether the whole canvas fits in the window at the current zoom: nothing to pan. */
+    boolean showsAll() {
+        return bounds.width() * zoom() <= width && bounds.height() * zoom() <= height;
+    }
+
     /** Whether the centre is within {@code snap} of the canvas point {@code (x, y)}, within bounds. */
     boolean isAt(double x, double y, double snap) {
         return Math.abs(clampX(x) - centerX) <= snap && Math.abs(clampY(y) - centerY) <= snap;

@@ -10,11 +10,6 @@ $C = "../../Common.ui";
   LetterSpacing: 0.5
 );
 
-// Invisible button, see the ring around the minimap.
-@Ring = Button {
-  Style: (Default: (Background: #000000(0.0)));
-};
-
 $C.@PageOverlay {
   LayoutMode: Middle;
 
@@ -141,22 +136,6 @@ $C.@PageOverlay {
 
           Group #MinimapGrid {
           }
-        }
-
-        // A ring of invisible buttons around the minimap: entering one means
-        // the cursor left the minimap, which ends follow mode. Wider on the
-        // canvas side so that a quick move cannot skip it.
-        @Ring #RingTop {
-          Anchor: (Right: 0, Bottom: 192, Width: 336, Height: 24);
-        }
-        @Ring #RingLeft {
-          Anchor: (Right: 312, Bottom: 0, Width: 24, Height: 192);
-        }
-        @Ring #RingBottom {
-          Anchor: (Right: 0, Bottom: 0, Width: 312, Height: 12);
-        }
-        @Ring #RingRight {
-          Anchor: (Right: 0, Bottom: 12, Width: 12, Height: 180);
         }
       }
     }
