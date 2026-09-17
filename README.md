@@ -70,8 +70,15 @@ a browser, then times out. Two ways through it:
   With the Flatpak launcher that path is under
   `~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/install/...`.
 
-In game, `/talents` lists the registered graphs — the smoke test that the plugin
-loaded and the API is reachable.
+In game, `/talents` opens the talent page (`/talents list` lists the registered
+graphs — the smoke test that the plugin loaded and the API is reachable).
+
+The page is also an interaction target, so any item, block or NPC can open it
+from its JSON, the native way:
+
+```json
+{ "Type": "OpenCustomUI", "Page": { "Id": "TalentGraph" } }
+```
 
 Identity and versions live in `gradle.properties`; `manifest.json` is generated
 from it, so edit the properties rather than the manifest.

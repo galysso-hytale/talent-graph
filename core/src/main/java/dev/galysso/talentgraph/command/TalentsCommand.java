@@ -16,6 +16,7 @@ import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Comparator;
 import java.util.Optional;
 
@@ -48,11 +49,27 @@ public class TalentsCommand extends AbstractPlayerCommand {
         return api.registry().graphs().stream().min(Comparator.comparing(g -> g.id().toString()));
     }
 
+    /**
+     * The page on the default graph for a player, or null when no graph is
+     * registered. Shared by the command and the {@code OpenCustomUI}
+     * interaction. The tracker gets the last load with its problems drawn,
+     * if any.
+     */
+    @Nullable
+    public static TalentGraphPage pageFor(TalentGraphApi api, LiveReload live, PlayerRef playerRef) {
+        TalentGraph graph = defaultGraph(api).orElse(null);
+        if (graph == null) {
+            return null;
+        }
+        return new TalentGraphPage(playerRef, live.viewFor(playerRef.getUuid(), graph),
+                api.talentsOf(playerRef.getUuid()), null, false);
+    }
+
     @Override
     protected void execute(@Nonnull CommandContext context, @Nonnull Store<EntityStore> store,
                            @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
-        TalentGraph graph = defaultGraph(api).orElse(null);
-        if (graph == null) {
+        TalentGraphPage page = pageFor(api, live, playerRef);
+        if (page == null) {
             context.sendMessage(Message.raw("No talent graph registered."));
             return;
         }
@@ -60,8 +77,6 @@ public class TalentsCommand extends AbstractPlayerCommand {
         if (player == null) {
             return;
         }
-        // The tracker gets the last load with its problems drawn, if any.
-        player.getPageManager().openCustomPage(ref, store, new TalentGraphPage(playerRef,
-                live.viewFor(playerRef.getUuid(), graph), api.talentsOf(playerRef.getUuid()), null, false));
+        player.getPageManager().openCustomPage(ref, store, page);
     }
 }

@@ -10,6 +10,16 @@ $C = "../../Common.ui";
   LetterSpacing: 0.5
 );
 
+// Input hints, in the style of the tool legends of the game.
+@HintStyle = LabelStyle(
+  FontSize: 12,
+  FontName: "Secondary",
+  RenderBold: true,
+  RenderUppercase: true,
+  VerticalAlignment: Center,
+  TextColor: #ffffff(0.8)
+);
+
 $C.@PageOverlay {
   LayoutMode: Middle;
 
@@ -178,6 +188,51 @@ $C.@PageOverlay {
           }
 
           Group #MinimapGrid {
+          }
+        }
+
+        // How to drive the minimap, as a caption on its top edge: the
+        // game's own mouse glyphs (the small ones of the tool legends),
+        // one word each, in the same frame as the minimap and shown with
+        // it. The right-click hint changes with the follow mode, in words
+        // and not only in colour.
+        Group #MinimapHelp {
+          Anchor: (Right: 12, Bottom: 196, Width: 300, Height: 30);
+          Background: (TexturePath: "Node/Badge.png", Border: 6);
+          LayoutMode: Left;
+          Padding: (Horizontal: 8);
+
+          Group {
+            Anchor: (Top: 4, Bottom: 4, Width: 22);
+            Background: (TexturePath: "../../Common/SmallInputIconMouseLeftClick.png");
+          }
+
+          Label {
+            Anchor: (Left: 4);
+            Style: @HintStyle;
+            Text: "Center view";
+          }
+
+          Group {
+            FlexWeight: 1;
+          }
+
+          Group {
+            Anchor: (Top: 4, Bottom: 4, Width: 22);
+            Background: (TexturePath: "../../Common/SmallInputIconMouseRightClick.png");
+          }
+
+          Label #FollowHint {
+            Anchor: (Left: 4);
+            Style: @HintStyle;
+            Text: "Follow cursor";
+          }
+
+          Label #FollowingHint {
+            Visible: false;
+            Anchor: (Left: 4);
+            Style: (...@HintStyle, TextColor: #f2c94c);
+            Text: "Stop following";
           }
         }
       }

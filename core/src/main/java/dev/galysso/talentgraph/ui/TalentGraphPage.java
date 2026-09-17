@@ -203,6 +203,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
      * button and no other cell sees the cursor until it is released.
      */
     private boolean following;
+    /** Whether the minimap hint still shows the previous follow state; the next frame out fixes it. */
+    private boolean followHintStale;
     /** The canvas point the window is gliding to; meaningful while {@link #glide} runs. */
     private double targetX;
     private double targetY;
@@ -386,11 +388,19 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         if (point == null) {
             return;
         }
+        boolean wasFollowing = following;
         following = toggle && !following;
+        followHintStale |= following != wasFollowing;
         if (LOG_NAVIGATION) {
             LOGGER.at(Level.INFO).log("minimap: %s at %s (following=%b)", toggle ? "right click" : "click", point, following);
         }
         glideTo(point);
+        if (followHintStale && glide == null) {
+            // Nothing to glide to, so no frame will carry the hint: send it alone.
+            UICommandBuilder commands = new UICommandBuilder();
+            updateFollowHint(commands);
+            sendUpdate(commands, new UIEventBuilder(), false);
+        }
     }
 
     /** The cursor entered a minimap cell: head there if following. */
@@ -442,6 +452,9 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         UICommandBuilder commands = new UICommandBuilder();
         placeContent(commands);
         updateMinimapWindow(commands);
+        if (followHintStale) {
+            updateFollowHint(commands); // ride along rather than cost an update of its own
+        }
         // Straight to the wire rather than through sendUpdate, which would
         // wait for the world thread and its once-a-tick flush.
         pages.updateCustomPage(new CustomPage(getClass().getName(), false, false, getLifetime(),
@@ -627,7 +640,16 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         commands.set("#ZoomLevel.Text", camera.zoomPercent() + " %");
         commands.set("#ZoomIn.Disabled", !camera.canZoomIn());
         commands.set("#ZoomOut.Disabled", !camera.canZoomOut());
-        commands.set("#Minimap.Visible", pannable && !camera.showsAll());
+        boolean minimap = pannable && !camera.showsAll();
+        commands.set("#Minimap.Visible", minimap);
+        commands.set("#MinimapHelp.Visible", minimap);
+    }
+
+    /** The right-click hint of the minimap legend says whether follow mode is on. */
+    private void updateFollowHint(UICommandBuilder commands) {
+        commands.set("#FollowHint.Visible", !following);
+        commands.set("#FollowingHint.Visible", following);
+        followHintStale = false;
     }
 
     /** Refreshes the state of a node. */

@@ -1,6 +1,7 @@
 package dev.galysso.talentgraph;
 
 import com.hypixel.hytale.server.core.io.adapter.PacketAdapters;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.server.OpenCustomUIInteraction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
@@ -40,6 +41,10 @@ public class TalentGraphPlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, progressType));
         getCommandRegistry().registerCommand(
                 new TalentsCommand("talents", "Open the talent page", api, live, assets));
+        // The page as an interaction target, the native way to open one from
+        // any item, block or NPC: {"Type": "OpenCustomUI", "Page": {"Id": "TalentGraph"}}.
+        OpenCustomUIInteraction.registerSimple(this, TalentGraphPage.class, "TalentGraph",
+                playerRef -> TalentsCommand.pageFor(api, live, playerRef));
         PacketAdapters.registerInbound(TalentGraphPage.EVENT_FILTER);
     }
 }
