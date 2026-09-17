@@ -7,6 +7,7 @@ import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentId;
 import dev.galysso.talentgraph.asset.GraphReport;
 import dev.galysso.talentgraph.asset.LoadedGraph;
+import dev.galysso.talentgraph.effect.EffectCatalog;
 import dev.galysso.talentgraph.ui.GraphLayouts;
 import dev.galysso.talentgraph.ui.TalentGraphPage;
 
@@ -36,15 +37,17 @@ public final class LiveReload {
 
     private final TalentGraphApiImpl api;
     private final GraphLayouts layouts;
+    private final EffectCatalog effects;
     /** The admin following the files, or null. */
     @Nullable
     private volatile UUID tracker;
     /** Last result of each graph that had something to report, for the tracker's view. */
     private final Map<TalentId, LoadedGraph> annotated = new ConcurrentHashMap<>();
 
-    public LiveReload(TalentGraphApiImpl api, GraphLayouts layouts) {
+    public LiveReload(TalentGraphApiImpl api, GraphLayouts layouts, EffectCatalog effects) {
         this.api = api;
         this.layouts = layouts;
+        this.effects = effects;
     }
 
     // ---- tracking ----
@@ -101,7 +104,12 @@ public final class LiveReload {
                 return last;
             }
         }
-        return LoadedGraph.of(graph, layouts.layoutOf(graph));
+        return registered(graph);
+    }
+
+    /** {@return the registered version of a graph, with nothing to report} */
+    private LoadedGraph registered(TalentGraph graph) {
+        return LoadedGraph.of(graph, layouts.layoutOf(graph), effects.of(graph.id()));
     }
 
     // ---- reload results ----
@@ -130,7 +138,7 @@ public final class LiveReload {
                 return null; // keeps the last good version
             }
             TalentGraph graph = api.registry().graph(graphId).orElse(null);
-            return graph == null ? null : page.successor(LoadedGraph.of(graph, layouts.layoutOf(graph)), false);
+            return graph == null ? null : page.successor(registered(graph), false);
         });
         if (admin != null) {
             String name = report.fileName();
@@ -160,7 +168,7 @@ public final class LiveReload {
         GraphReport report = GraphReport.unparsable(fileName, message);
         TalentGraph graph = api.registry().graph(graphId).orElse(null);
         LoadedGraph shown = graph != null
-                ? new LoadedGraph(graph, layouts.layoutOf(graph), report)
+                ? registered(graph).withReport(report)
                 : annotated.containsKey(graphId) ? annotated.get(graphId).withReport(report) : null;
         if (shown != null) {
             annotated.put(graphId, shown);

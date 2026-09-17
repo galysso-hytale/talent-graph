@@ -1,11 +1,17 @@
 package dev.galysso.talentgraph.asset;
 
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.common.CommonAsset;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
 import dev.galysso.talentgraph.api.TalentException;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphBuilder;
 import dev.galysso.talentgraph.api.TalentId;
+import dev.galysso.talentgraph.effect.AbilityEffect;
+import dev.galysso.talentgraph.effect.EffectValidation;
+import dev.galysso.talentgraph.effect.EquipmentBaseline;
+import dev.galysso.talentgraph.effect.References;
+import dev.galysso.talentgraph.effect.TalentEffect;
 import dev.galysso.talentgraph.ui.AutoLayout;
 import dev.galysso.talentgraph.ui.GraphLayout;
 
@@ -13,6 +19,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -34,6 +41,11 @@ import java.util.Set;
  * from the pack's own folder {@value #PACK_ROOT} unless it starts with a
  * root of {@code Common/} ({@code UI/}, {@code Icons/}) or names an asset
  * the server already knows.</p>
+ *
+ * <p>Effects are validated here as well, against the loaded assets given
+ * as {@link References}; every fault of an effect is a warning that drops
+ * or repairs the effect, never an error, so a typo in an effect keeps the
+ * graph playable.</p>
  */
 public final class GraphLoader {
 
@@ -59,6 +71,7 @@ public final class GraphLoader {
 
     private final TalentGraphAsset asset;
     private final String fileName;
+    private final References refs;
     private final List<GraphProblem> problems = new ArrayList<>();
     private final List<GraphReport.Ghost> ghosts = new ArrayList<>();
     private String namespace;
@@ -67,9 +80,10 @@ public final class GraphLoader {
     /** Talents in file order, once their id is accepted. */
     private final Map<TalentId, Entry> entries = new LinkedHashMap<>();
 
-    private GraphLoader(TalentGraphAsset asset, String fileName) {
+    private GraphLoader(TalentGraphAsset asset, String fileName, References refs) {
         this.asset = asset;
         this.fileName = fileName;
+        this.refs = refs;
     }
 
     /**
@@ -77,10 +91,11 @@ public final class GraphLoader {
      *
      * @param asset    the file as decoded by the asset store
      * @param fileName the file name, for messages
+     * @param refs     the loaded assets, to check what the effects name
      * @return a drawable graph and the report on the file
      */
-    public static LoadedGraph load(TalentGraphAsset asset, String fileName) {
-        return new GraphLoader(asset, fileName).load();
+    public static LoadedGraph load(TalentGraphAsset asset, String fileName, References refs) {
+        return new GraphLoader(asset, fileName, refs).load();
     }
 
     private LoadedGraph load() {
@@ -88,9 +103,10 @@ public final class GraphLoader {
         readTalents();
         resolvePrerequisites();
         cutCycles();
+        GraphEffects effects = readEffects();
         TalentGraph graph = build();
         GraphLayout layout = layout(graph);
-        return new LoadedGraph(graph, layout, new GraphReport(fileName, true, problems, ghosts));
+        return new LoadedGraph(graph, layout, effects, new GraphReport(fileName, true, problems, ghosts));
     }
 
     // ---- identity ----
@@ -190,6 +206,68 @@ public final class GraphLoader {
             warning(id, "Icon not found: " + resolved);
         }
         return resolved;
+    }
+
+    // ---- effects ----
+
+    /**
+     * Validates the equipment baseline and every talent's effects. Each
+     * fault is a warning naming the effect by its position and type, and
+     * the faulty effect is dropped: a talent keeps its other effects.
+     */
+    private GraphEffects readEffects() {
+        EquipmentBaseline baseline = asset.getEquipment();
+        if (baseline == null) {
+            baseline = EquipmentBaseline.NONE;
+        } else {
+            baseline.validate(refs, this::warning);
+        }
+        Map<TalentId, List<TalentEffect>> byTalent = new LinkedHashMap<>();
+        for (Map.Entry<TalentId, Entry> e : entries.entrySet()) {
+            TalentId id = e.getKey();
+            Entry entry = e.getValue();
+            TalentEffect[] effects = entry.def.getEffects();
+            List<TalentEffect> kept = new ArrayList<>();
+            for (int i = 0; i < effects.length; i++) {
+                TalentEffect effect = effects[i];
+                if (effect == null) {
+                    warning(id, "Effect #" + (i + 1) + " is null; skipped");
+                    continue;
+                }
+                String label = "Effect #" + (i + 1) + " (" + effect.type() + "): ";
+                EffectValidation validation = new EffectValidation(entry.maxRank, refs,
+                        message -> warning(id, label + message));
+                if (effect.validate(validation)) {
+                    kept.add(effect);
+                }
+            }
+            if (!kept.isEmpty()) {
+                byTalent.put(id, List.copyOf(kept));
+            }
+        }
+        warnSharedSlots(byTalent);
+        return new GraphEffects(baseline, byTalent);
+    }
+
+    /**
+     * Two talents binding the same slot without a held-item condition can
+     * both be unlocked, and then only priority and file order decide. Worth
+     * a warning: the author probably meant one or the other.
+     */
+    private void warnSharedSlots(Map<TalentId, List<TalentEffect>> byTalent) {
+        Map<InteractionType, TalentId> unconditional = new EnumMap<>(InteractionType.class);
+        for (Map.Entry<TalentId, List<TalentEffect>> e : byTalent.entrySet()) {
+            for (TalentEffect effect : e.getValue()) {
+                if (!(effect instanceof AbilityEffect ability) || !ability.heldItem().isEmpty()) {
+                    continue;
+                }
+                TalentId first = unconditional.putIfAbsent(ability.slot(), e.getKey());
+                if (first != null && !first.equals(e.getKey())) {
+                    warning(e.getKey(), "Ability on " + ability.slot() + " without \"HeldItem\", like \""
+                            + entries.get(first).rawId + "\": when both are unlocked, \"Priority\" then file order decide");
+                }
+            }
+        }
     }
 
     // ---- prerequisites ----

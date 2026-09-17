@@ -13,8 +13,11 @@ import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import dev.galysso.talentgraph.api.TalentId;
+import dev.galysso.talentgraph.effect.EffectCatalog;
+import dev.galysso.talentgraph.effect.References;
 import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.ui.GraphLayouts;
@@ -27,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,6 +51,12 @@ import java.util.logging.Level;
  * <p>A file the store cannot parse is dropped by the store, which then
  * reports it as removed. Since the file is still there, that removal is
  * turned into a "cannot be read" report and the previous graph stays.</p>
+ *
+ * <p>At boot the store hands over its files while other packs may still be
+ * loading, so the stats, effects, interactions and items an effect names
+ * are not all known yet. Those loads are held back and run once
+ * {@link LoadAssetEvent} reaches its late priority, after every pack. A
+ * hot reload happens with everything loaded and is validated at once.</p>
  */
 public final class TalentGraphAssets {
 
@@ -55,16 +65,23 @@ public final class TalentGraphAssets {
     private final HytaleLogger logger;
     private final TalentGraphApiImpl api;
     private final GraphLayouts layouts;
+    private final EffectCatalog effects;
     private final LiveReload live;
+    /** Whether every asset pack is loaded, so effect references can be checked. */
+    private boolean assetsReady;
+    /** Files handed over before {@link #assetsReady}, in arrival order; guarded by {@code this}. */
+    private final Map<String, TalentGraphAsset> deferred = new LinkedHashMap<>();
     /** Graph id of each asset key, registered or not, so removals need no namespace lookup. */
     private final ConcurrentMap<String, TalentId> known = new ConcurrentHashMap<>();
     /** Source file of each asset key, to tell a parse failure from a deletion. */
     private final ConcurrentMap<String, Path> files = new ConcurrentHashMap<>();
 
-    public TalentGraphAssets(HytaleLogger logger, TalentGraphApiImpl api, GraphLayouts layouts, LiveReload live) {
+    public TalentGraphAssets(HytaleLogger logger, TalentGraphApiImpl api, GraphLayouts layouts,
+                             EffectCatalog effects, LiveReload live) {
         this.logger = logger;
         this.api = api;
         this.layouts = layouts;
+        this.effects = effects;
         this.live = live;
     }
 
@@ -82,6 +99,8 @@ public final class TalentGraphAssets {
                 .build());
         plugin.getEventRegistry().register(LoadedAssetsEvent.class, TalentGraphAsset.class, this::onLoaded);
         plugin.getEventRegistry().register(RemovedAssetsEvent.class, TalentGraphAsset.class, this::onRemoved);
+        plugin.getEventRegistry().register(LoadAssetEvent.PRIORITY_LOAD_LATE, LoadAssetEvent.class,
+                event -> onAllAssetsLoaded());
     }
 
     /**
@@ -118,19 +137,45 @@ public final class TalentGraphAssets {
             if (path != null) {
                 files.put(asset.getId(), path);
             }
-            // One broken file must not prevent the others from loading.
-            try {
-                load(asset, path);
-            } catch (RuntimeException e) {
-                logger.at(Level.SEVERE).withCause(e)
-                        .log("Talent graph '%s' could not be loaded: %s", asset.getId(), e.getMessage());
+            synchronized (this) {
+                if (!assetsReady) {
+                    deferred.put(asset.getId(), asset);
+                    continue;
+                }
             }
+            loadSafely(asset, path);
+        }
+    }
+
+    /** Every pack is loaded: the files held back at boot can be checked. */
+    private void onAllAssetsLoaded() {
+        List<TalentGraphAsset> pending;
+        synchronized (this) {
+            assetsReady = true;
+            pending = new ArrayList<>(deferred.values());
+            deferred.clear();
+        }
+        for (TalentGraphAsset asset : pending) {
+            loadSafely(asset, files.get(asset.getId()));
+        }
+    }
+
+    /** One broken file must not prevent the others from loading. */
+    private void loadSafely(TalentGraphAsset asset, @Nullable Path path) {
+        try {
+            load(asset, path);
+        } catch (RuntimeException e) {
+            logger.at(Level.SEVERE).withCause(e)
+                    .log("Talent graph '%s' could not be loaded: %s", asset.getId(), e.getMessage());
         }
     }
 
     private void onRemoved(RemovedAssetsEvent<String, TalentGraphAsset,
             AssetMap<String, TalentGraphAsset>> event) {
         for (String key : event.getRemovedAssets()) {
+            synchronized (this) {
+                deferred.remove(key);
+            }
             Path path = files.get(key);
             TalentId graphId = known.get(key);
             if (path != null && Files.exists(path)) {
@@ -147,6 +192,7 @@ public final class TalentGraphAssets {
             if (graphId != null) {
                 api.removeGraph(graphId);
                 layouts.remove(graphId);
+                effects.remove(graphId);
                 live.onRemoved(graphId);
                 logger.at(Level.INFO).log("Talent graph %s removed", graphId);
             }
@@ -155,13 +201,14 @@ public final class TalentGraphAssets {
 
     private void load(TalentGraphAsset asset, @Nullable Path path) {
         String fileName = path != null ? path.getFileName().toString() : asset.getId() + ".json";
-        LoadedGraph result = GraphLoader.load(asset, fileName);
+        LoadedGraph result = GraphLoader.load(asset, fileName, References.LIVE);
         TalentId graphId = result.graph().id();
         TalentId previous = known.put(asset.getId(), graphId);
         if (previous != null && !previous.equals(graphId)) {
             // The Namespace field changed on reload: the old id must go away.
             api.removeGraph(previous);
             layouts.remove(previous);
+            effects.remove(previous);
             live.onRemoved(previous);
         }
         GraphReport report = result.report();
@@ -174,6 +221,7 @@ public final class TalentGraphAssets {
         if (registered) {
             api.replaceGraph(result.graph());
             layouts.put(graphId, result.layout());
+            effects.put(graphId, result.effects());
             logger.at(Level.INFO).log("Talent graph %s loaded (%d talents%s)", graphId,
                     result.graph().talents().size(),
                     report.isEmpty() ? "" : ", " + report.summary());

@@ -3,6 +3,8 @@ package dev.galysso.talentgraph.asset;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import dev.galysso.talentgraph.effect.EffectTypes;
+import dev.galysso.talentgraph.effect.TalentEffect;
 
 import javax.annotation.Nullable;
 
@@ -13,12 +15,14 @@ import javax.annotation.Nullable;
  * <pre>{@code
  * { "Id": "cleave", "Name": "Cleave", "MaxRank": 1, "Cost": [2],
  *   "Requires": ["toughness"], "Icon": "Weapon_Sword_Copper",
- *   "X": 320, "Y": 180 }
+ *   "X": 320, "Y": 180,
+ *   "Effects": [ { "Type": "Stat", "Stat": "Health", "Amount": 10 } ] }
  * }</pre>
  *
  * <p>{@code Icon} is either one word, a vanilla item id, or a path relative
  * to the pack's {@code Common/UI/Custom/TalentGraph/} folder; see
- * {@link GraphLoader#resolveIcon}.</p>
+ * {@link GraphLoader#resolveIcon}. {@code Effects} is what the talent does
+ * to the player, one entry per effect type; see {@code docs/EFFECTS.md}.</p>
  */
 public final class TalentDefinition {
 
@@ -40,6 +44,8 @@ public final class TalentDefinition {
             // use hand-placed nodes; otherwise the whole graph is auto-laid out.
             .append(new KeyedCodec<>("X", Codec.INTEGER, false), (d, v) -> d.x = v, d -> d.x).add()
             .append(new KeyedCodec<>("Y", Codec.INTEGER, false), (d, v) -> d.y = v, d -> d.y).add()
+            .append(new KeyedCodec<>("Effects", EffectTypes.LIST_CODEC, false),
+                    (d, v) -> d.effects = v, d -> d.effects).add()
             .build();
 
     private String id;
@@ -53,6 +59,7 @@ public final class TalentDefinition {
     private Integer x;
     @Nullable
     private Integer y;
+    private TalentEffect[] effects = new TalentEffect[0];
 
     public String getId() {
         return id;
@@ -87,6 +94,11 @@ public final class TalentDefinition {
     @Nullable
     public Integer getY() {
         return y;
+    }
+
+    /** {@return the effects as decoded, not yet validated} */
+    public TalentEffect[] getEffects() {
+        return effects;
     }
 
     boolean hasPosition() {

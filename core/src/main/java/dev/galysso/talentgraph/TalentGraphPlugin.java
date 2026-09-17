@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
 import dev.galysso.talentgraph.asset.TalentGraphAssets;
 import dev.galysso.talentgraph.command.TalentsCommand;
+import dev.galysso.talentgraph.effect.EffectCatalog;
 import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.internal.TalentProgressComponent;
@@ -23,7 +24,8 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     private final TalentGraphApiImpl api = new TalentGraphApiImpl();
     private final GraphLayouts layouts = new GraphLayouts();
-    private final LiveReload live = new LiveReload(api, layouts);
+    private final EffectCatalog effects = new EffectCatalog();
+    private final LiveReload live = new LiveReload(api, layouts, effects);
 
     public TalentGraphPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -34,7 +36,7 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, live);
+        TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, effects, live);
         assets.register(this);
         var progressType = getEntityStoreRegistry().registerComponent(
                 TalentProgressComponent.class, "TalentGraphProgress", TalentProgressComponent.CODEC);

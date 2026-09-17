@@ -7,6 +7,7 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
+import dev.galysso.talentgraph.effect.EquipmentBaseline;
 
 import javax.annotation.Nullable;
 
@@ -31,6 +32,9 @@ public final class TalentGraphAsset
             // relative to the pack (see GraphLoader.resolveAsset).
             .append(new KeyedCodec<>("Background", Codec.STRING, false),
                     (a, v) -> a.background = v, a -> a.background).add()
+            // What players cannot use until a talent allows it; see EquipmentBaseline.
+            .append(new KeyedCodec<>("Equipment", EquipmentBaseline.CODEC, false),
+                    (a, v) -> a.equipment = v, a -> a.equipment).add()
             .append(new KeyedCodec<>("Talents",
                             new ArrayCodec<>(TalentDefinition.CODEC, TalentDefinition[]::new)),
                     (a, v) -> a.talents = v, a -> a.talents).add()
@@ -42,6 +46,8 @@ public final class TalentGraphAsset
     private String namespace = DEFAULT_NAMESPACE;
     @Nullable
     private String background;
+    @Nullable
+    private EquipmentBaseline equipment;
     private TalentDefinition[] talents = new TalentDefinition[0];
 
     @Override
@@ -60,6 +66,12 @@ public final class TalentGraphAsset
     @Nullable
     public String getBackground() {
         return background;
+    }
+
+    /** {@return the {@code "Equipment"} section, or null when absent} */
+    @Nullable
+    public EquipmentBaseline getEquipment() {
+        return equipment;
     }
 
     public TalentDefinition[] getTalents() {
