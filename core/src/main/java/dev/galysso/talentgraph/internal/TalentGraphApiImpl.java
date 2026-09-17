@@ -1,5 +1,6 @@
 package dev.galysso.talentgraph.internal;
 
+import com.hypixel.hytale.logger.HytaleLogger;
 import dev.galysso.talentgraph.api.PlayerTalents;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphApi;
@@ -14,6 +15,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 
 /**
  * The single implementation of {@link TalentGraphApi}, published to third-party
@@ -21,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class TalentGraphApiImpl implements TalentGraphApi {
 
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final TalentRegistryImpl registry = new TalentRegistryImpl();
     private final Map<UUID, PlayerTalentsImpl> players = new ConcurrentHashMap<>();
     private final List<TalentListener> listeners = new CopyOnWriteArrayList<>();
@@ -56,14 +59,26 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
 
     /**
      * Registers a graph loaded from data, replacing a previous version with
-     * the same id on hot reload.
+     * the same id on hot reload. Online players keep their ranks by id and
+     * are refunded what the new version no longer offers; offline players
+     * keep their entries as saved, a talent that comes back finds them.
      *
      * @param graph the graph to add
      * @throws dev.galysso.talentgraph.api.TalentException if one of its
      *         talents already belongs to another graph
      */
     public void replaceGraph(TalentGraph graph) {
+        TalentGraph previous = registry.graph(graph.id()).orElse(null);
         registry.replace(graph);
+        if (previous != null) {
+            for (PlayerTalentsImpl player : players.values()) {
+                int refunded = player.reconcile(previous, graph);
+                if (refunded > 0) {
+                    LOGGER.at(Level.INFO).log("Refunded %d point(s) to %s after reloading %s",
+                            refunded, player.playerId(), graph.id());
+                }
+            }
+        }
     }
 
     /**
@@ -90,8 +105,8 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
             try {
                 listener.onTalentUnlocked(event);
             } catch (RuntimeException e) {
-                System.err.println("[TalentGraph] Listener " + listener.getClass().getName()
-                        + " failed on " + event + ": " + e);
+                LOGGER.at(Level.WARNING).withCause(e).log("Listener %s failed on %s",
+                        listener.getClass().getName(), event);
             }
         }
     }

@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
 import dev.galysso.talentgraph.asset.TalentGraphAssets;
 import dev.galysso.talentgraph.command.TalentsCommand;
+import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.internal.TalentProgressComponent;
 import dev.galysso.talentgraph.internal.TalentProgressSystem;
@@ -21,6 +22,7 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     private final TalentGraphApiImpl api = new TalentGraphApiImpl();
     private final GraphLayouts layouts = new GraphLayouts();
+    private final LiveReload live = new LiveReload(api, layouts);
 
     public TalentGraphPlugin(@Nonnull JavaPluginInit init) {
         super(init);
@@ -31,12 +33,13 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        new TalentGraphAssets(getLogger(), api, layouts).register(this);
+        TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, live);
+        assets.register(this);
         var progressType = getEntityStoreRegistry().registerComponent(
                 TalentProgressComponent.class, "TalentGraphProgress", TalentProgressComponent.CODEC);
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, progressType));
         getCommandRegistry().registerCommand(
-                new TalentsCommand("talents", "Open the talent page", api, layouts));
+                new TalentsCommand("talents", "Open the talent page", api, live, assets));
         PacketAdapters.registerInbound(TalentGraphPage.EVENT_FILTER);
     }
 }

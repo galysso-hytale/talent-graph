@@ -1,0 +1,15 @@
+{
+    "Group": "Galysso",
+    "Name": "talentgraph-example",
+    "Version": "0.1.0",
+    "Description": "A talent graph to copy: one JSON, one background, one custom icon.",
+    "Authors": [
+        {
+            "Name": "Jocelin"
+        }
+    ],
+    "IncludesAssetPack": true,
+    "Dependencies": {
+        "Galysso:talentgraph": "*"
+    }
+}

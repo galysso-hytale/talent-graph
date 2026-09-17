@@ -37,6 +37,12 @@ Group {
     Style: (Default: (Background: (TexturePath: "Node/Maxed.png", Border: 8)));
   }
 
+  // A ghost: a prerequisite that names no talent, drawn where the author
+  // will look for it (see LiveReload). Dashed frame, no state.
+  @StateFrame #Ghost {
+    Style: (Default: (Background: (TexturePath: "Node/Ghost.png", Border: 8)));
+  }
+
   // The only interactive element, shown solely when the talent can be
   // unlocked right now. Transparent at rest so the state frame shows through.
   Button #Action {
@@ -63,6 +69,25 @@ Group {
   Group #Dim {
     Visible: false;
     Background: (TexturePath: "Node/Dim.png", Border: 8);
+  }
+
+  // Author aid: the ring and the "!" of a talent whose entry in the file
+  // has a problem; the tooltip of the frame says which.
+  Group #Problem {
+    Visible: false;
+    Background: (TexturePath: "Node/Error.png", Border: 8);
+  }
+
+  Group #ProblemBadge {
+    Visible: false;
+    Anchor: (Left: -6, Top: -6, Width: 18, Height: 18);
+    Background: (TexturePath: "Node/Badge.png", Border: 6);
+    LayoutMode: CenterMiddle;
+
+    Label {
+      Style: (...@BadgeStyle, FontSize: 13, TextColor: #e05a5a);
+      Text: "!";
+    }
   }
 
   // Price of the next rank: the number, white when affordable and red

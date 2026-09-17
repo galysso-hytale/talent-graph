@@ -188,6 +188,14 @@ public final class GenerateTextures {
                     "png", dir.resolve("Action_Hovered" + suffix(scale) + ".png").toFile());
             ImageIO.write(roundedSquare(NODE, CORNER, new Color(0x06, 0x0b, 0x14, 0x99), null, 0f, scale),
                     "png", dir.resolve("Dim" + suffix(scale) + ".png").toFile());
+            // Author aids: the ring of a faulty talent, over its state frame,
+            // and the frame of a ghost (a prerequisite naming no talent),
+            // dashed so that it reads as "not really there" without colour.
+            ImageIO.write(roundedSquare(NODE, CORNER, null, new Color(0xe0, 0x5a, 0x5a), 3f, scale),
+                    "png", dir.resolve("Error" + suffix(scale) + ".png").toFile());
+            ImageIO.write(dashedSquare(NODE, CORNER, new Color(0x0d, 0x15, 0x22, 0xb0),
+                    new Color(0x96, 0xa9, 0xbe), 2.5f, scale), "png",
+                    dir.resolve("Ghost" + suffix(scale) + ".png").toFile());
             ImageIO.write(roundedSquare(BADGE, 10, new Color(0x06, 0x0b, 0x14, 0xe6),
                     new Color(0xff, 0xff, 0xff, 0x30), 1f, scale), "png",
                     dir.resolve("Badge" + suffix(scale) + ".png").toFile());
@@ -252,6 +260,24 @@ public final class GenerateTextures {
             g.setStroke(new BasicStroke(ringWidth));
             g.draw(shape);
         }
+        g.dispose();
+        return img;
+    }
+
+    /** Like {@link #roundedSquare} with the ring dashed, ten dashes a side. */
+    private static BufferedImage dashedSquare(int size, int corner, Color fill, Color ring, float ringWidth, int scale) {
+        int texels = size * scale;
+        BufferedImage img = new BufferedImage(texels, texels, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = graphics(img);
+        g.scale(scale, scale);
+        float inset = ringWidth / 2f + 0.5f / scale;
+        var shape = new RoundRectangle2D.Float(inset, inset, size - 2 * inset, size - 2 * inset, corner, corner);
+        g.setColor(fill);
+        g.fill(shape);
+        g.setColor(ring);
+        g.setStroke(new BasicStroke(ringWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f,
+                new float[] {5f, 4f}, 0f));
+        g.draw(shape);
         g.dispose();
         return img;
     }

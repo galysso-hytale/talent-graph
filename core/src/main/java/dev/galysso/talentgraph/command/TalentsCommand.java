@@ -11,7 +11,8 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentGraphApi;
-import dev.galysso.talentgraph.ui.GraphLayouts;
+import dev.galysso.talentgraph.asset.TalentGraphAssets;
+import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
@@ -20,20 +21,24 @@ import java.util.Optional;
 
 /**
  * {@code /talents} opens the talent page on the first registered graph.
- * Sub-commands: {@code list}, {@code grant}, {@code reset}.
+ * Sub-commands: {@code list}, {@code grant}, {@code reset}, {@code track},
+ * {@code reload}.
  */
 public class TalentsCommand extends AbstractPlayerCommand {
 
     private final TalentGraphApi api;
-    private final GraphLayouts layouts;
+    private final LiveReload live;
 
-    public TalentsCommand(String name, String description, TalentGraphApi api, GraphLayouts layouts) {
+    public TalentsCommand(String name, String description, TalentGraphApi api, LiveReload live,
+                          TalentGraphAssets assets) {
         super(name, description);
         this.api = api;
-        this.layouts = layouts;
+        this.live = live;
         addSubCommand(new ListSubCommand(api));
         addSubCommand(new GrantSubCommand(api));
         addSubCommand(new ResetSubCommand(api));
+        addSubCommand(new TrackSubCommand(live));
+        addSubCommand(new ReloadSubCommand(assets));
     }
 
     /**
@@ -55,7 +60,8 @@ public class TalentsCommand extends AbstractPlayerCommand {
         if (player == null) {
             return;
         }
-        player.getPageManager().openCustomPage(ref, store, new TalentGraphPage(
-                playerRef, graph, layouts.layoutOf(graph), api.talentsOf(playerRef.getUuid())));
+        // The tracker gets the last load with its problems drawn, if any.
+        player.getPageManager().openCustomPage(ref, store, new TalentGraphPage(playerRef,
+                live.viewFor(playerRef.getUuid(), graph), api.talentsOf(playerRef.getUuid()), null, false));
     }
 }

@@ -1,0 +1,43 @@
+{
+    "Name": "Example",
+    "Background": "Example/Background.png",
+    "Talents": [
+        {
+            "Id": "vigor",
+            "Name": "Vigor",
+            "Icon": "Armor_Iron_Chest",
+            "MaxRank": 3,
+            "Cost": [1, 2, 3],
+            "X": 764,
+            "Y": 414
+        },
+        {
+            "Id": "spark",
+            "Name": "Spark",
+            "Icon": "Example/Spark.png",
+            "Cost": [2],
+            "Requires": ["vigor"],
+            "X": 1064,
+            "Y": 214
+        },
+        {
+            "Id": "cleave",
+            "Name": "Cleave",
+            "Icon": "Weapon_Sword_Copper",
+            "Cost": [2],
+            "Requires": ["vigor"],
+            "X": 1064,
+            "Y": 614
+        },
+        {
+            "Id": "storm",
+            "Name": "Storm",
+            "Icon": "Weapon_Sword_Iron",
+            "MaxRank": 2,
+            "Cost": [3, 4],
+            "Requires": ["spark", "cleave"],
+            "X": 1364,
+            "Y": 414
+        }
+    ]
+}

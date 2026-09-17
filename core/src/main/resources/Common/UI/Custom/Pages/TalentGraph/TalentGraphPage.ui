@@ -105,12 +105,56 @@ $C.@PageOverlay {
           }
         }
 
+        // Author aid (see LiveReload): one line over the top of the canvas
+        // when the file behind the graph was reloaded with problems, or
+        // cannot be read. A button so that it carries a tooltip, which
+        // lists every problem. The mark is the cue that owes nothing to
+        // colour: "!" for problems, the check of a clean reload.
+        Button #Banner {
+          Visible: false;
+          Anchor: (Left: 12, Top: 12, Width: 1558, Height: 30);
+          Style: (Default: (Background: (TexturePath: "Node/Badge.png", Border: 6)));
+          TextTooltipShowDelay: 0.1;
+          TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+          LayoutMode: Left;
+          Padding: (Horizontal: 10);
+
+          Label #BannerMark {
+            Anchor: (Width: 14);
+            Style: (FontSize: 15, RenderBold: true, VerticalAlignment: Center, TextColor: #e05a5a);
+            Text: "!";
+          }
+
+          Group #BannerCheck {
+            Visible: false;
+            Anchor: (Top: 10, Bottom: 10, Width: 14);
+            LayoutMode: CenterMiddle;
+
+            Group {
+              Anchor: (Width: 12, Height: 10);
+              Background: (TexturePath: "Node/Check.png");
+            }
+          }
+
+          Label #BannerText {
+            Anchor: (Left: 8);
+            Style: (FontSize: 13, VerticalAlignment: Center, TextColor: #f0f4ff);
+            Text: "";
+          }
+        }
+
         // The whole graph at a glance, and the only way to move the window:
         // a grid of invisible buttons (appended by the server) covers it,
         // each sending the window to the point under it.
         Group #Minimap {
           Anchor: (Right: 12, Bottom: 12, Width: 300, Height: 180);
           Background: (TexturePath: "Node/Badge.png", Border: 6);
+
+          // With a background image the minimap shows it, scaled: the map
+          // of the graph is the graph's own picture. Anchored by the server.
+          AssetImage #MinimapBackground {
+            Visible: false;
+          }
 
           Group #MinimapDots {
           }

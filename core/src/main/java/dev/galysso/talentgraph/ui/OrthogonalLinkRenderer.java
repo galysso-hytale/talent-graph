@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 public final class OrthogonalLinkRenderer implements LinkRenderer {
 
     private static final int THICKNESS = 2;
+    private static final int DASH = 16;
 
     @Override
     public void render(UICommandBuilder builder, String selector, Camera camera,
@@ -28,6 +29,19 @@ public final class OrthogonalLinkRenderer implements LinkRenderer {
 
     private static void rectangle(UICommandBuilder builder, String selector, Camera camera,
                                   int left, int top, int width, int height, LinkState state) {
+        if (state.dashed()) {
+            // Dashes as long as the gaps, along the long side.
+            boolean horizontal = width >= height;
+            int length = horizontal ? width : height;
+            for (int offset = 0; offset < length; offset += 2 * DASH) {
+                int run = Math.min(DASH, length - offset);
+                builder.appendInline(selector, "Group { " + (horizontal
+                        ? camera.projectMarkup(left + offset, top, run, height)
+                        : camera.projectMarkup(left, top + offset, width, run))
+                        + "; Background: (Color: " + state.color() + "); }");
+            }
+            return;
+        }
         builder.appendInline(selector, "Group { " + camera.projectMarkup(left, top, width, height)
                 + "; Background: (Color: " + state.color() + "); }");
     }

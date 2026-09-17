@@ -112,6 +112,38 @@ final class PlayerTalentsImpl implements PlayerTalents {
         return refunded;
     }
 
+    /**
+     * Adjusts the ranks after a graph was replaced by a new version of
+     * itself. Ranks are kept by id; a talent that disappeared, or whose
+     * max rank dropped below the rank reached, refunds the ranks lost at
+     * the prices of the previous version. A talent whose cost merely
+     * changed keeps its rank, the points already spent staying spent.
+     *
+     * @param previous    the version the ranks were earned in
+     * @param replacement the version now registered
+     * @return the points refunded
+     */
+    synchronized int reconcile(TalentGraph previous, TalentGraph replacement) {
+        int refunded = 0;
+        for (Talent talent : previous.talents()) {
+            Integer rank = ranks.get(talent.id());
+            if (rank == null) {
+                continue;
+            }
+            int kept = replacement.talent(talent.id()).map(t -> Math.min(rank, t.maxRank())).orElse(0);
+            for (int i = kept + 1; i <= rank; i++) {
+                refunded += talent.costOfRank(i);
+            }
+            if (kept == 0) {
+                ranks.remove(talent.id());
+            } else {
+                ranks.put(talent.id(), kept);
+            }
+        }
+        availablePoints += refunded;
+        return refunded;
+    }
+
     private boolean isAffordable(Talent talent) {
         int nextRank = ranks.getOrDefault(talent.id(), 0) + 1;
         if (nextRank > talent.maxRank()) {

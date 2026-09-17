@@ -8,6 +8,8 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 
+import javax.annotation.Nullable;
+
 /**
  * A talent graph as read from {@code Server/TalentGraph/Graphs/<id>.json}.
  * The file name is the asset id and becomes the graph's path; the graph's
@@ -25,6 +27,10 @@ public final class TalentGraphAsset
             .append(new KeyedCodec<>("Name", Codec.STRING), (a, v) -> a.name = v, a -> a.name).add()
             .append(new KeyedCodec<>("Namespace", Codec.STRING, false),
                     (a, v) -> a.namespace = v, a -> a.namespace).add()
+            // Image drawn under the graph, which then sizes the canvas: a path
+            // relative to the pack (see GraphLoader.resolveAsset).
+            .append(new KeyedCodec<>("Background", Codec.STRING, false),
+                    (a, v) -> a.background = v, a -> a.background).add()
             .append(new KeyedCodec<>("Talents",
                             new ArrayCodec<>(TalentDefinition.CODEC, TalentDefinition[]::new)),
                     (a, v) -> a.talents = v, a -> a.talents).add()
@@ -34,6 +40,8 @@ public final class TalentGraphAsset
     private AssetExtraInfo.Data data;
     private String name;
     private String namespace = DEFAULT_NAMESPACE;
+    @Nullable
+    private String background;
     private TalentDefinition[] talents = new TalentDefinition[0];
 
     @Override
@@ -47,6 +55,11 @@ public final class TalentGraphAsset
 
     public String getNamespace() {
         return namespace;
+    }
+
+    @Nullable
+    public String getBackground() {
+        return background;
     }
 
     public TalentDefinition[] getTalents() {

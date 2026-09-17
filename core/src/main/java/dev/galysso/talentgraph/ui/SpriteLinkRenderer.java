@@ -112,6 +112,9 @@ public final class SpriteLinkRenderer implements LinkRenderer {
         int height = tileSize(b);
         String texture = direction.texture();
         for (int k = firstTile; k <= lastTile; k++) {
+            if (state.dashed() && (k & 1) != 0) {
+                continue; // one tile in two: dashes as long as the gaps
+            }
             int left = originX + k * a - width / 2;
             int top = originY + k * b - height / 2;
             builder.appendInline(selector, "Group { " + camera.projectMarkup(left, top, width, height)

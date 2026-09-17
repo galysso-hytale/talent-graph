@@ -50,6 +50,27 @@ final class Camera {
         return ZOOM_LEVELS[level];
     }
 
+    /** {@return where the window is and how close, to hand over to a page rebuilt on the same graph} */
+    View view() {
+        return new View(level, centerX, centerY);
+    }
+
+    /** Puts the window back where a previous camera was, within the bounds of this one. */
+    void restore(View view) {
+        level = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, view.level()));
+        centerOn(view.centerX(), view.centerY());
+    }
+
+    /**
+     * A snapshot of the window.
+     *
+     * @param level   index in {@link #ZOOM_LEVELS}
+     * @param centerX canvas x at the middle of the window
+     * @param centerY canvas y at the middle of the window
+     */
+    record View(int level, double centerX, double centerY) {
+    }
+
     /** {@return the zoom as a percentage, for display} */
     int zoomPercent() {
         return (int) Math.round(zoom() * 100);

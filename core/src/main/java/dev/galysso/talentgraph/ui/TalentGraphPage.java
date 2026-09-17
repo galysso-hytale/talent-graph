@@ -28,8 +28,12 @@ import dev.galysso.talentgraph.api.Talent;
 import dev.galysso.talentgraph.api.TalentException;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentId;
+import dev.galysso.talentgraph.asset.GraphProblem;
+import dev.galysso.talentgraph.asset.GraphReport;
+import dev.galysso.talentgraph.asset.LoadedGraph;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -41,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 /**
@@ -74,6 +79,12 @@ import java.util.logging.Level;
  * <p>Only a talent the player can unlock right now reacts to the cursor: its
  * {@code #Action} overlay is the sole node element bound to an event.
  * Everything else is inert and explains itself through its tooltip.</p>
+ *
+ * <p>The page also serves the author of the graph (see {@code LiveReload}):
+ * given a {@link GraphReport} with problems, it marks the faulty nodes,
+ * draws the ghosts of unknown prerequisites at the end of dashed links and
+ * sums it all up in a banner. A graph with errors is a preview: nothing on
+ * it can be unlocked.</p>
  */
 public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPage.Event> {
 
@@ -89,9 +100,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** Size of the canvas window in screen units; must match {@code #Stage} in the page markup. */
     static final int VIEWPORT_WIDTH = 1582;
     static final int VIEWPORT_HEIGHT = 864;
-    /** Largest canvas that fits entirely in the window at the widest zoom. */
-    public static final int MAX_CANVAS_WIDTH = (int) (VIEWPORT_WIDTH / Camera.ZOOM_LEVELS[Camera.ZOOM_LEVELS.length - 1]);
-    public static final int MAX_CANVAS_HEIGHT = (int) (VIEWPORT_HEIGHT / Camera.ZOOM_LEVELS[Camera.ZOOM_LEVELS.length - 1]);
     /** Badges hold text, which does not scale: they only show above this zoom. */
     private static final double BADGE_MIN_ZOOM = 0.5;
 
@@ -154,9 +162,19 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private static final String COLOR_MUTED = "#96a9be";
     private static final String COLOR_OK = "#3fa86f";
     private static final String COLOR_BLOCKED = "#e05a5a";
+    private static final String COLOR_WARNING = "#f2c94c";
+    /** Lines of the banner tooltip, past which the log is the place to look. */
+    private static final int MAX_BANNER_LINES = 20;
+    private static final String GHOST_COLOR = "#e05a5a";
 
     private final TalentGraph graph;
     private final GraphLayout layout;
+    /** What was wrong with the file; empty for a registered graph opened normally. */
+    private final GraphReport report;
+    /** Whether the page follows a reload the player is tracking, which the banner says. */
+    private final boolean live;
+    /** A graph with errors is shown to be fixed, not played. */
+    private final boolean preview;
     private final PlayerTalents talents;
     /** Talents in a fixed order, the one of the minimap dots. */
     private final List<Talent> order;
@@ -174,6 +192,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** Child index in {@code #Canvas} of the link group and node of each talent shown right now. */
     private final Map<TalentId, Integer> linkIndex = new HashMap<>();
     private final Map<TalentId, Integer> nodeIndex = new HashMap<>();
+    /** Child index in {@code #Canvas} of each ghost of the report, in its order. */
+    private final List<Integer> ghostIndex = new ArrayList<>();
 
     /**
      * Follow mode: the window follows the cursor over the minimap. A right
@@ -192,11 +212,21 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private ScheduledFuture<?> glide;
     private long lastGlideSendNanos;
 
-    public TalentGraphPage(@Nonnull PlayerRef playerRef, TalentGraph graph, GraphLayout layout,
-                           PlayerTalents talents) {
+    /**
+     * @param playerRef the player the page is for
+     * @param view      the graph, its layout and what to report about its file
+     * @param talents   the player's progression
+     * @param restore   where a previous page on the same graph was looking, or null to open on the root
+     * @param live      whether the page replaces one after a tracked reload
+     */
+    public TalentGraphPage(@Nonnull PlayerRef playerRef, LoadedGraph view, PlayerTalents talents,
+                           @Nullable Camera.View restore, boolean live) {
         super(playerRef, CustomPageLifetime.CanDismiss, Event.CODEC);
-        this.graph = graph;
-        this.layout = layout;
+        this.graph = view.graph();
+        this.layout = view.layout();
+        this.report = view.report();
+        this.live = live;
+        this.preview = report.hasErrors();
         this.talents = talents;
         this.order = new ArrayList<>(graph.talents());
         order.sort(Comparator.comparing(t -> t.id().toString()));
@@ -212,6 +242,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 (double) (MINIMAP_HEIGHT - 2 * MINIMAP_PADDING) / bounds.height());
         this.minimapLeft = (MINIMAP_WIDTH - bounds.width() * minimapScale) / 2;
         this.minimapTop = (MINIMAP_HEIGHT - bounds.height() * minimapScale) / 2;
+        if (restore != null) {
+            camera.restore(restore);
+            return;
+        }
         // Open on the root of the graph: the first talent without prerequisite.
         for (Talent talent : order) {
             if (talent.prerequisites().isEmpty()) {
@@ -219,6 +253,74 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 camera.centerOn(centre.x(), centre.y());
                 break;
             }
+        }
+    }
+
+    /** {@return the player looking at this page} */
+    public UUID playerId() {
+        return playerRef.getUuid();
+    }
+
+    /**
+     * A page on the same graph, freshly loaded, looking at the same spot.
+     *
+     * @param view the graph as reloaded
+     * @param live whether the player is tracking the reload
+     * @return the page to open in place of this one
+     */
+    public TalentGraphPage successor(LoadedGraph view, boolean live) {
+        Camera.View current;
+        synchronized (this) {
+            current = camera.view();
+        }
+        return new TalentGraphPage(playerRef, view, talents, current, live);
+    }
+
+    /**
+     * Replaces the page of every player looking at a graph, each on the
+     * thread of their world. Safe to call from any thread.
+     *
+     * @param graphId     the graph that changed
+     * @param replacement the new page for a player, given the current one, or null to leave it
+     */
+    public static void reopen(TalentId graphId, Function<TalentGraphPage, TalentGraphPage> replacement) {
+        for (TalentGraphPage page : OPEN.values()) {
+            if (!page.graph.id().equals(graphId)) {
+                continue;
+            }
+            Ref<EntityStore> ref = page.playerRef.getReference();
+            if (ref == null || !ref.isValid()) {
+                continue;
+            }
+            Store<EntityStore> store = ref.getStore();
+            store.getExternalData().getWorld().execute(() -> {
+                // Still the open page: it may have been closed in the meantime.
+                if (!ref.isValid() || OPEN.get(page.playerRef.getUuid()) != page) {
+                    return;
+                }
+                TalentGraphPage next = replacement.apply(page);
+                if (next != null) {
+                    page.pages.openCustomPage(ref, store, next);
+                }
+            });
+        }
+    }
+
+    /** Closes the page of every player looking at a graph that no longer exists. */
+    public static void closeAll(TalentId graphId) {
+        for (TalentGraphPage page : OPEN.values()) {
+            if (!page.graph.id().equals(graphId)) {
+                continue;
+            }
+            Ref<EntityStore> ref = page.playerRef.getReference();
+            if (ref == null || !ref.isValid()) {
+                continue;
+            }
+            ref.getStore().getExternalData().getWorld().execute(() -> {
+                if (ref.isValid() && OPEN.get(page.playerRef.getUuid()) == page) {
+                    page.close();
+                }
+            });
         }
     }
 
@@ -241,6 +343,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             updateMinimapWindow(commands);
         }
         updateZoomControls(commands);
+        updateBanner(commands);
         renderCanvas(commands, events);
     }
 
@@ -428,7 +531,15 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         placeContent(commands);
         linkIndex.clear();
         nodeIndex.clear();
+        ghostIndex.clear();
         int index = 0;
+        // The background image, stretched over the whole scaled canvas.
+        if (layout.background() != null) {
+            GraphLayout.Bounds bounds = layout.bounds();
+            commands.appendInline("#Graph", "AssetImage { " + camera.projectMarkup(bounds.minX(), bounds.minY(),
+                    bounds.width(), bounds.height()) + "; }");
+            commands.set("#Graph[" + index++ + "].AssetPath", layout.background());
+        }
         // Links first: an empty group per talent with an incoming link.
         for (Talent talent : order) {
             if (hasLink(talent)) {
@@ -447,11 +558,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             GraphLayout.Point p = position(talent);
             nodeIndex.put(talent.id(), index++);
             String selector = nodeSelector(talent);
-            commands.append("#Graph", NODE_UI);
-            commands.setObject(selector + ".Anchor",
-                    camera.project(p.x(), p.y(), GraphLayout.NODE_SIZE, GraphLayout.NODE_SIZE));
-            int icon = camera.scale(ICON_SIZE);
-            commands.setObject(selector + " #Icon.Anchor", Camera.anchor(0, 0, icon, icon));
+            appendNode(commands, selector, p, size);
             if (badges) {
                 if (hasPips(talent)) {
                     anchorPips(commands, selector, talent.maxRank(), size);
@@ -464,10 +571,36 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             if (iconPath != null) {
                 commands.set(selector + " #Icon.AssetPath", iconPath);
             }
+            List<GraphProblem> problems = report.of(talent.id());
+            commands.set(selector + " #Problem.Visible", !problems.isEmpty());
+            commands.set(selector + " #ProblemBadge.Visible", badges && !problems.isEmpty());
             updateNode(commands, talent);
             events.addEventBinding(CustomUIEventBindingType.Activating, selector + " #Action",
                     EventData.of("Unlock", talent.id().toString()), false);
         }
+        // Ghosts last, on top: a node with the dashed frame and the missing icon.
+        for (GraphReport.Ghost ghost : report.ghosts()) {
+            ghostIndex.add(index);
+            String selector = "#Graph[" + index++ + "]";
+            appendNode(commands, selector, ghost.position(), size);
+            commands.set(selector + " #Ghost.Visible", true);
+            commands.set(selector + " #Cost.Visible", false);
+            commands.set(selector + " #ProblemBadge.Visible", badges);
+            String dependent = graph.talent(ghost.dependent()).map(Talent::displayName)
+                    .orElse(ghost.dependent().toString());
+            commands.set(selector + " #Ghost.TooltipTextSpans", Message.empty()
+                    .insert(Message.raw(ghost.reference()).bold(true).color(COLOR_TITLE))
+                    .insert(blocked("No talent has this id; " + dependent + " requires it")));
+        }
+    }
+
+    /** Appends a node template at a canvas position, sized for the zoom, every state hidden. */
+    private void appendNode(UICommandBuilder commands, String selector, GraphLayout.Point p, int size) {
+        commands.append("#Graph", NODE_UI);
+        commands.setObject(selector + ".Anchor",
+                camera.project(p.x(), p.y(), GraphLayout.NODE_SIZE, GraphLayout.NODE_SIZE));
+        int icon = camera.scale(ICON_SIZE);
+        commands.setObject(selector + " #Icon.Anchor", Camera.anchor(0, 0, icon, icon));
     }
 
     /** Moves the drawing of the graph so that the window shows what the camera looks at. */
@@ -475,14 +608,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         commands.setObject("#Graph.Anchor", camera.contentAnchor());
     }
 
-    /** Whether {@code talent} has a prerequisite on this canvas, hence a link to draw. */
+    /** Whether {@code talent} has a prerequisite on this canvas, a ghost included, hence a link to draw. */
     private boolean hasLink(Talent talent) {
         for (TalentId prerequisiteId : talent.prerequisites()) {
             if (graph.talent(prerequisiteId).isPresent()) {
                 return true;
             }
         }
-        return false;
+        return !report.ghostsOf(talent.id()).isEmpty();
     }
 
     private void updatePoints(UICommandBuilder commands) {
@@ -548,7 +681,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             commands.set(selector + " #CostNo.Visible", !affordable);
             commands.set(selector + " #" + (affordable ? "CostOk" : "CostNo") + ".Text", String.valueOf(cost));
         }
-        boolean actionable = affordable && state != NodeState.LOCKED;
+        boolean actionable = affordable && state != NodeState.LOCKED && !preview;
         commands.set(selector + " #Action.Visible", actionable);
         // The overlay sits above the frame, so whichever is hit must carry the tooltip.
         Message tooltip = tooltip(talent, rank, state, affordable);
@@ -573,6 +706,60 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             }
             LINKS.render(commands, selector, camera, centerOf(prerequisite), to, linkState(prerequisite, talent));
         }
+        for (GraphReport.Ghost ghost : report.ghostsOf(talent.id())) {
+            LINKS.render(commands, selector, camera, centerOf(ghost.position()), to, LinkState.BROKEN);
+        }
+    }
+
+    // ---- banner ----
+
+    /**
+     * Shows the report, if there is one to show: the file cannot be read,
+     * has problems, or was just reloaded cleanly while tracked. The tooltip
+     * holds one line per problem.
+     */
+    private void updateBanner(UICommandBuilder commands) {
+        boolean problems = !report.isEmpty();
+        boolean visible = problems || live;
+        commands.set("#Banner.Visible", visible);
+        if (!visible) {
+            return;
+        }
+        String text;
+        Message tooltip;
+        if (!report.parsed()) {
+            text = report.problems().get(0).message() + " - the previous version stays";
+            tooltip = Message.raw(report.problems().get(0).message()).color(COLOR_BLOCKED);
+        } else if (problems) {
+            text = report.fileName() + ": " + report.summary()
+                    + (preview ? " - preview, players keep the previous version" : "")
+                    + " (hover for the list)";
+            tooltip = Message.empty();
+            int lines = 0;
+            for (GraphProblem problem : report.problems()) {
+                if (lines++ == MAX_BANNER_LINES) {
+                    tooltip.insert(Message.raw("\n... " + (report.problems().size() - MAX_BANNER_LINES)
+                            + " more in the server log").color(COLOR_MUTED));
+                    break;
+                }
+                String where = problem.talent() != null ? localName(problem.talent()) + ": " : "";
+                tooltip.insert(Message.raw((lines > 1 ? "\n" : "") + where + problem.message())
+                        .color(problem.isError() ? COLOR_BLOCKED : COLOR_WARNING));
+            }
+        } else {
+            text = report.fileName() + " reloaded: " + graph.talents().size() + " talent(s), no problem";
+            tooltip = Message.raw("Tracking " + report.fileName() + "; /talents track stop to end").color(COLOR_MUTED);
+        }
+        commands.set("#BannerMark.Visible", problems);
+        commands.set("#BannerCheck.Visible", !problems);
+        commands.set("#BannerText.Text", text);
+        commands.set("#Banner.TooltipTextSpans", tooltip);
+    }
+
+    /** The id of a talent as written in its file: the path without the graph prefix. */
+    private String localName(TalentId talent) {
+        String prefix = graph.id().path() + '/';
+        return talent.path().startsWith(prefix) ? talent.path().substring(prefix.length()) : talent.toString();
     }
 
     // ---- minimap ----
@@ -586,6 +773,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
      * beside the graph pans to its edge.
      */
     private void buildMinimap(UICommandBuilder commands, UIEventBuilder events) {
+        if (layout.background() != null) {
+            GraphLayout.Bounds bounds = layout.bounds();
+            commands.setObject("#MinimapBackground.Anchor", Camera.anchor(
+                    (int) Math.round(minimapLeft), (int) Math.round(minimapTop),
+                    (int) Math.round(bounds.width() * minimapScale), (int) Math.round(bounds.height() * minimapScale)));
+            commands.set("#MinimapBackground.AssetPath", layout.background());
+            commands.set("#MinimapBackground.Visible", true);
+        }
         updateMinimapDots(commands);
         int columns = (MINIMAP_WIDTH + MINIMAP_CELL - 1) / MINIMAP_CELL;
         int rows = (MINIMAP_HEIGHT + MINIMAP_CELL - 1) / MINIMAP_CELL;
@@ -618,6 +813,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             commands.appendInline("#MinimapDots", "Group { Anchor: (Left: " + left + ", Top: " + top
                     + ", Width: " + DOT_SIZE + ", Height: " + DOT_SIZE + "); Background: (Color: "
                     + state.color() + "); }");
+        }
+        for (GraphReport.Ghost ghost : report.ghosts()) {
+            GraphLayout.Point centre = centerOf(ghost.position());
+            int left = (int) Math.round(toMinimapX(centre.x())) - DOT_SIZE / 2;
+            int top = (int) Math.round(toMinimapY(centre.y())) - DOT_SIZE / 2;
+            commands.appendInline("#MinimapDots", "Group { Anchor: (Left: " + left + ", Top: " + top
+                    + ", Width: " + DOT_SIZE + ", Height: " + DOT_SIZE + "); Background: (Color: "
+                    + GHOST_COLOR + "); }");
         }
     }
 
@@ -695,6 +898,12 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         if (talent.maxRank() > 1) {
             tip.insert(Message.raw("\nRank " + rank + "/" + talent.maxRank()).color(COLOR_MUTED));
         }
+        for (GraphProblem problem : report.of(talent.id())) {
+            tip.insert(Message.raw("\n" + problem.message()).color(problem.isError() ? COLOR_BLOCKED : COLOR_WARNING));
+        }
+        if (preview) {
+            return tip.insert(Message.raw("\nPreview: fix the file to play").italic(true).color(COLOR_MUTED));
+        }
         return switch (state) {
             case MAXED -> tip.insert(ok(talent.maxRank() > 1 ? "Max rank reached" : "Already unlocked"));
             case LOCKED -> {
@@ -741,7 +950,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     }
 
     private GraphLayout.Point centerOf(Talent talent) {
-        GraphLayout.Point p = position(talent);
+        return centerOf(position(talent));
+    }
+
+    private static GraphLayout.Point centerOf(GraphLayout.Point p) {
         return new GraphLayout.Point(p.x() + GraphLayout.NODE_SIZE / 2, p.y() + GraphLayout.NODE_SIZE / 2);
     }
 

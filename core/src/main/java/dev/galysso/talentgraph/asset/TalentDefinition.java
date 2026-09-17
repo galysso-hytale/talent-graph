@@ -12,9 +12,13 @@ import javax.annotation.Nullable;
  *
  * <pre>{@code
  * { "Id": "cleave", "Name": "Cleave", "MaxRank": 1, "Cost": [2],
- *   "Requires": ["toughness"], "Icon": "UI/Custom/Pages/TalentGraph/Icons/Cleave.png",
+ *   "Requires": ["toughness"], "Icon": "Weapon_Sword_Copper",
  *   "X": 320, "Y": 180 }
  * }</pre>
+ *
+ * <p>{@code Icon} is either one word, a vanilla item id, or a path relative
+ * to the pack's {@code Common/UI/Custom/TalentGraph/} folder; see
+ * {@link GraphLoader#resolveIcon}.</p>
  */
 public final class TalentDefinition {
 
