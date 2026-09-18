@@ -1,0 +1,5 @@
+{
+  "Interactions": [ "Mage_Blink" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Mage_Blink", "Cooldown": 6 }
+}

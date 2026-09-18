@@ -4,9 +4,9 @@ What a talent does to the player is written in its graph file, as a list of
 typed **effects**. This file is the reference: a value that is not listed
 here is not supported, and the loader says so on the tree.
 
-> **Status.** The format and its validation are in place. Applying the
-> effects in game comes step by step, `Stat` first; until an effect type is
-> applied, a valid effect is accepted, shown in the report, and does nothing.
+> **Status.** The format and its validation are in place. `Stat`,
+> `EntityEffect`, `Equipment` and `Ability` are applied in game;
+> `Movement` is accepted, shown in the report, and does nothing yet.
 
 The mod does not invent game mechanics. Each effect type is a bridge to
 something the server already does — entity stats, entity effects, root
@@ -124,7 +124,7 @@ and *Max* are the player's, before any item or effect.
 | `Stamina` | Sprinting, dodging, attacks. | 10 / −4 / 10 | Goes negative when overspent, hence the minimum. `Max` ×1.2 makes long fights easier. |
 | `Mana` | Magic weapons' resource. | 0 / 0 / 0 | The maximum is **0** until a magic item opens it: a `Max` bonus alone gives nothing to a warrior, but adds to a wand's pool. |
 | `Oxygen` | Breath under water. | 100 / 0 / 100 | Refills fast out of water. |
-| `SignatureEnergy` | Charge of the weapon's signature ability (`Ability1`). | 0 / 0 / 0 | Maximum opened by the wielded weapon, like `Mana`. |
+| `SignatureEnergy` | Charge of the weapon's signature ability (`Ability1`). | 0 / 0 / 0 | Maximum opened by the wielded weapon (sword 20, mace 8, flame staff 10, plain staffs none), filled by its hits. |
 | `SignatureCharges` | Stored signature charges. | 0 / 0 / 100 | Internal to the signature system; hidden from tooltips. |
 | `MagicCharges` | Charges of magic weapons, regenerating one every 2 s. | 0 / 0 / 0 | Maximum opened by the item; hidden from tooltips. |
 | `Immunity` | Builds up while immune; at 100 applies the `Immune` effect. | 0 / 0 / 100 | Decays by itself. Of little use to a talent. |
@@ -328,11 +328,13 @@ Possession is never touched: a forbidden item can be picked up, carried in
 the hotbar, sold, dropped or given. Using it is what is blocked:
 
 - **In hand or in the off hand**: the item stays where it is, visible, and
-  its five keys are redirected to a refusal that shows a short HUD
-  notification (`Primary`, `Ability1`–`Ability3` follow the item in hand;
-  `Secondary` follows the off-hand item when there is one, since right
-  click runs it, otherwise the item in hand). No swing, no arrow, no
-  ability. The hotbar is never reordered.
+  the keys it would answer are redirected to a refusal that shows a short
+  HUD notification. Which item answers a key is decided as vanilla does:
+  the item in hand, except that right click goes to the off-hand item when
+  the weapon in hand is one-handed (`Utility.Compatible`: a sword, not a
+  staff), an item with a higher declared priority for a key takes it, and
+  an empty hand lets the off-hand item answer every key. No swing, no
+  arrow, no ability. The hotbar is never reordered.
 - **Its stat modifiers are stripped**: a forbidden sword or bow fills no
   signature energy, a forbidden crossbow gives no ammo — the item is worn
   like a stick. Vanilla's own armour and effect modifiers are untouched.
@@ -394,34 +396,169 @@ it names no longer exists.
 
 ## Ability
 
-Binds a Hytale root interaction to one of the player's interaction slots,
-optionally only while a matching item is held.
+Binds a Hytale root interaction to one of the player's keys, optionally
+only while a matching item is held.
 
 ```json
 { "Type": "Ability", "Slot": "Ability2", "Interaction": "MyPack_Root_Heal",
   "HeldItem": ["Family=Staff", "Family=Mace"] }
+{ "Type": "Ability", "Slot": "Primary", "Interaction": ["MyPack_Bolt_1", "MyPack_Bolt_2", "MyPack_Bolt_3"],
+  "HeldItem": ["Family=Staff"] }
 ```
 
 | Field | Required | Values | Default |
 |---|---|---|---|
-| `Slot` | yes | `Ability1`, `Ability2`, `Ability3`, `Primary`, `Secondary`. | — |
-| `Interaction` | yes | A `RootInteraction` id: a file `Server/Item/RootInteractions/<Id>.json` in your pack. | — |
-| `HeldItem` | no | Item list (as for `Equipment`). The ability is only bound while the item in hand matches. Absent: always bound. | always |
-| `Priority` | no | Integer. Two unlocked talents on the same slot, both applicable: the highest wins, then file order. | 0 |
+| `Slot` | yes | `Primary`, `Secondary`, `Ability1`, `Ability2`, `Ability3`, `Pick`. | — |
+| `Interaction` | yes | A `RootInteraction` id — a file `Server/Item/RootInteractions/<Id>.json` in your pack — or an array with one id per rank, the last repeating. Only the id of the current rank is bound. | — |
+| `HeldItem` | no | Item list (as for `Equipment`). The ability is only bound while the judged item matches. Absent: always bound, empty hand included. | always |
+| `Priority` | no | Integer, see [Several abilities on one key](#several-abilities-on-one-key). | 0 |
 
 The ability itself is written with Hytale's interaction toolkit
-(`ChangeStat` for a heal, `Cooldown`, `Select` + `DamageEntity` for a spin,
-`ApplyEffect`, `LaunchProjectile`…); nothing about what it does is
-described in the graph.
+(`ChangeStat` for a heal, `Selector` + `DamageEntity` for a nova,
+`ApplyEffect`, `LaunchProjectile`, `ApplyForce`…); nothing about what it
+does is described in the graph, and this mod invents no spell language.
+The dev pack's `Mage.json` binds all six keys with vanilla bricks only:
+`Server/Item/RootInteractions/TalentGraph/Mage/` and
+`Server/Item/Interactions/TalentGraph/Mage/` are a worked example of every
+recipe below.
 
-| Slot | In game |
-|---|---|
-| `Ability1` | The weapon's **signature** ability in vanilla: binding it replaces the signature while the talent applies. |
-| `Ability2`, `Ability3` | Free in vanilla. Which keys the client binds them to is to be confirmed in game before this type is applied. |
-| `Primary`, `Secondary` | Left and right click: replaces the held item's basic attacks. Prefer an `EntityEffect` flag and a conditional branch in the item's own root interaction when the attack should merely change. |
+### Keys
 
-Two talents binding the same slot with no `HeldItem` get a warning: when
-both are unlocked, only `Priority` and file order decide.
+The server never sees a key press: the client starts an interaction chain
+of a given type, and the server runs what that type is bound to. These
+are the types a key starts, with the default binding (QWERTY position;
+AZERTY in brackets):
+
+| Slot | Default key | In vanilla |
+|---|---|---|
+| `Primary` | left click | The held item's attack. Binding it replaces the attack while the ability applies. |
+| `Secondary` | right click | The held item's secondary (guard, aim…). Judged on the item vanilla would run: the **off-hand item when the weapon in hand is one-handed** (a sword and a shield), the item in hand otherwise (a two-handed staff keeps right click whatever the off hand holds). |
+| `Ability1` | Q (A) | The weapon's **signature**. Binding it with a `HeldItem` replaces that weapon's signature; without one, every weapon's — the loader warns. |
+| `Ability2` | E | Free: no vanilla item uses it. The natural key for a class ability. |
+| `Ability3` | R | Free, except the crossbow's reload. Empty-handed it is "use block or entity", a duplicate of `Use`. The loader warns when a `HeldItem` covers an item that defines its own `Ability3`. |
+| `Pick` | middle click | Pick block, useful in creative only. The ability's root interaction can keep that behaviour in creative with `Condition` + `RequiredGameMode` (see `Mage_Focus`). |
+
+**Two-step vanilla abilities.** Some signatures use two keys: the flame
+staff's Q only arms a trap (it sets the stat `DeployablePreview`, which
+the client draws on the ground), and the *left click* places it — its
+`Primary` root starts with `StatsCondition Costs { DeployablePreview: 1 }`
+before falling back to the fireball. Replace `Primary` on such an item
+and the trap can no longer be placed; worse, a preview armed earlier
+stays on the ground for good, since nothing consumes the stat any more.
+Before binding `Primary` or `Ability1` on a family, read the roots of
+its items: what one key starts, another may finish.
+
+`Use` (F) is deliberately not a slot: it opens doors, talks to NPCs and
+harvests, **with a weapon in hand too** (every item is completed with the
+unarmed defaults). The hotbar keys 1–9 change the selected slot on the
+client's authority and cannot be bound to anything; a spell per number key
+is a spell *item* in the hotbar, as vanilla's wands and spellbooks — see
+`GrantItem` when it lands.
+
+More spells than keys, without a protocol change: a `Condition` at the
+top of the root interaction (`Crouching`, `Running`, `Jumping`,
+`Swimming`, `Flying`, `RequiredGameMode`) makes crouch + key a second
+spell, predicted by the client; `Charging` distinguishes tap from hold;
+`RunRootInteraction` wraps the item's vanilla ability instead of replacing
+it; an id per rank makes the spell grow.
+
+### Costs, cooldowns, ammunition
+
+All vanilla, all inside the root interaction, word for word the wands'
+recipe (`Wand_Cast_Left_Charged`):
+
+```json
+{
+  "Type": "StatsCondition",
+  "Costs": { "Mana": 25 },
+  "Failed": "TalentGraph_NoMana",
+  "Next": {
+    "Type": "Serial",
+    "Interactions": [
+      { "Type": "ChangeStat", "StatModifiers": { "Mana": -25 } },
+      { "Type": "LaunchProjectile", "ProjectileId": "Fireball" }
+    ]
+  }
+}
+```
+
+- `StatsCondition` refuses when the stat is short and runs `Failed`;
+  `ChangeStat` pays. Mind each stat's scale (see the [vanilla
+  stats](#vanilla-stats) table): `Stamina` runs from 0 to **10**, `Mana`
+  to what opens it, `SignatureEnergy` to what the **wielded weapon**
+  declares (sword 20, mace 8, most staffs nothing at all) and it only
+  fills through the weapon's own hits (`EntityStatsOnHit`). An ability
+  that replaces a weapon's attack cuts that supply: give the talent its
+  own reserve (`{ "Type": "Stat", "Stat": "SignatureEnergy", "Amount":
+  10 }`) and charge it from the ability (`ChangeStat` with a positive
+  amount), as the dev pack's `nova` and bolts do. Stats worth using:
+  `Mana`, `Stamina`,
+  `SignatureEnergy` (with `"ValueType": "Percent"` and `Costs 100` for a
+  signature-like ability), `MagicCharges`, `SignatureCharges`.
+- `Mana` has a **maximum of 0** in vanilla: it is opened by items
+  (silk cloth armour) or by a `Stat` effect — `{ "Type": "Stat", "Stat":
+  "Mana", "Amount": 50 }` is the "awakening" talent every mage graph
+  starts with.
+- `Cooldown` on the root interaction (`{ "Id": "...", "Cooldown": 8 }`)
+  keeps the chain from starting again for that long; `RequireNewClick`
+  stops a held button from repeating. `CooldownCondition` +
+  `TriggerCooldown` put a cooldown on one branch only.
+- `ModifyInventory` with `ItemToRemove` consumes an item (ammunition,
+  reagent); `AdjustHeldItemDurability` wears the held item.
+- `TalentGraph_NoMana` and `TalentGraph_NoStamina`
+  (`Server/Item/Interactions/TalentGraph/`) are ready-made `Failed`
+  branches: a HUD notification, overridable by a pack file at the same
+  path like `TalentGraph_Denied`.
+
+### Several abilities on one key
+
+Only one root interaction can be bound to a key at a time. The judged
+item is the one vanilla would run for that key (see the `Secondary` row
+above; an empty hand with a shield is judged on the shield for every key).
+Among the unlocked talents whose ability is on the same slot and applies
+to it (no `HeldItem`, or one entry matching), the engine picks, in order:
+
+1. the highest `Priority`;
+2. the talent that **requires** the other, directly or through others —
+   the deeper talent is the stronger version;
+3. the more specific `HeldItem` match: an item id over a tag over no
+   `HeldItem`;
+4. file order, then graph id.
+
+So a power-up is written as **ranks** (`"Interaction": ["Bolt_1",
+"Bolt_2"]`) or as a talent that `Requires` the weaker one: it wins by
+itself. A specific item beats a family: `battle_mage` on `Ability1` with
+`Family=Sword` next to `nova` on `Ability1` with `Family=Staff` never
+collide, and an ability on `Weapon_Staff_Cobalt` beats one on
+`Family=Staff` when that staff is held.
+
+What is **not** resolved is two distinct spells a player can hold at once
+on the same key, with `HeldItem`s that name a common item (or none) and the
+same `Priority`: the loader warns on the graph, because file order would
+decide in game and the player would never know why. Remedies: give them
+disjoint `HeldItem`s by item id, different keys, make one require the
+other, or, when spell items exist, a grimoire per school. The engine
+never chains two spells on one key, nor picks at random.
+
+The equipment rules win over everything: an item the player may not use
+keeps its refusal on every key, whatever ability is bound there.
+
+### How it is applied
+
+Same pass as `Equipment` (world entry, rank change, reload, respawn, item
+in hand, off hand, armour or game mode change): the engine reads the item
+in hand and in the off hand, decides which one each key runs as vanilla
+does, resolves the six slots on it, merges the result
+with the equipment refusal — the refusal taking its keys — and writes the
+whole under the player's `Interactions` component in one go, with the
+same ownership rules (only free or own keys, only own keys given back,
+recorded in `TalentGraphApplied.Interactions`). The component is
+replicated to the client, which starts the chain for the bound root
+interaction as it would the item's own, and is saved with the player;
+after a crash the binding stays until the next world entry corrects it,
+and with the pack removed the server drops the unknown ids itself.
+Abilities are bound in creative mode too; only the equipment rules are
+exempt there. A dead player has none; they come back at respawn.
 
 ## Movement
 

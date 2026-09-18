@@ -1,0 +1,6 @@
+{
+  "Interactions": [ "Mage_Bolt_3" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Mage_Bolt_3", "Cooldown": 0.6 },
+  "Tags": { "Attack": [ "Ranged" ] }
+}

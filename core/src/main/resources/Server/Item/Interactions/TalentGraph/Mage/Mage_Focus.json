@@ -1,0 +1,43 @@
+{
+  "$Comment": "Focus: in adventure mode, 25 mana back, once every 30 s (the cooldown sits in this branch, not on the root, so that in creative the key keeps its vanilla job of picking the block aimed at).",
+  "Type": "Condition",
+  "RequiredGameMode": "Adventure",
+  "Next": {
+    "Type": "CooldownCondition",
+    "Id": "Mage_Focus",
+    "Failed": {
+      "Type": "TalentGraph_Notify",
+      "Message": "Focus is recovering"
+    },
+    "Next": {
+      "Type": "Serial",
+      "Interactions": [
+        {
+          "Type": "TriggerCooldown",
+          "Cooldown": { "Id": "Mage_Focus", "Cooldown": 30 }
+        },
+        {
+          "Type": "ChangeStat",
+          "StatModifiers": { "Mana": 25 },
+          "RunTime": 0.4,
+          "Effects": {
+            "ItemAnimationId": "Interact",
+            "WorldSoundEventId": "SFX_Ice_Break",
+            "Particles": [
+              {
+                "SystemId": "Blue_Beam",
+                "TargetEntityPart": "Entity",
+                "TargetNodeName": "Hip"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "Failed": {
+    "Type": "Simple",
+    "Effects": { "ItemAnimationId": "Interact" },
+    "Next": { "Type": "PickBlock" }
+  }
+}

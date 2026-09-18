@@ -1,0 +1,10 @@
+{
+  "Parent": "DamageEntityParent",
+  "DamageCalculator": {
+    "Class": "Signature",
+    "BaseDamage": { "Fire": 10 }
+  },
+  "DamageEffects": {
+    "WorldParticles": [ { "SystemId": "Impact_Fire" } ]
+  }
+}

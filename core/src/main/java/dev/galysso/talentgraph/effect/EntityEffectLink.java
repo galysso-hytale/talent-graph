@@ -1,19 +1,9 @@
 package dev.galysso.talentgraph.effect;
 
 import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.exception.CodecException;
-import com.hypixel.hytale.codec.schema.SchemaContext;
-import com.hypixel.hytale.codec.schema.config.ArraySchema;
-import com.hypixel.hytale.codec.schema.config.Schema;
-import com.hypixel.hytale.codec.schema.config.StringSchema;
-import org.bson.BsonArray;
-import org.bson.BsonString;
-import org.bson.BsonValue;
 
-import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -41,47 +31,9 @@ public final class EntityEffectLink extends TalentEffect {
 
     public static final String TYPE = "EntityEffect";
 
-    /** Accepts a string or an array of strings; anything else is a file error. */
-    static final Codec<String[]> IDS_CODEC = new Codec<>() {
-        @Override
-        public String[] decode(@Nonnull BsonValue value, ExtraInfo extraInfo) {
-            if (value.isString()) {
-                return new String[] {value.asString().getValue()};
-            }
-            if (value.isArray()) {
-                BsonArray array = value.asArray();
-                String[] ids = new String[array.size()];
-                for (int i = 0; i < ids.length; i++) {
-                    BsonValue item = array.get(i);
-                    if (!item.isString()) {
-                        throw new CodecException("Expected a string at index " + i + ", got " + item.getBsonType());
-                    }
-                    ids[i] = item.asString().getValue();
-                }
-                return ids;
-            }
-            throw new CodecException("Expected a string or an array of strings, got " + value.getBsonType());
-        }
-
-        @Override
-        public BsonValue encode(String[] ids, ExtraInfo extraInfo) {
-            BsonArray array = new BsonArray();
-            for (String id : ids) {
-                array.add(new BsonString(id));
-            }
-            return array;
-        }
-
-        @Nonnull
-        @Override
-        public Schema toSchema(@Nonnull SchemaContext context) {
-            return new ArraySchema(new StringSchema());
-        }
-    };
-
     public static final BuilderCodec<EntityEffectLink> CODEC = BuilderCodec.builder(
                     EntityEffectLink.class, EntityEffectLink::new, BASE_CODEC)
-            .append(new KeyedCodec<>("Id", IDS_CODEC, false), (e, v) -> e.ids = v, e -> e.ids).add()
+            .append(new KeyedCodec<>("Id", Ids.CODEC, false), (e, v) -> e.ids = v, e -> e.ids).add()
             .build();
 
     private String[] ids;
@@ -93,32 +45,12 @@ public final class EntityEffectLink extends TalentEffect {
 
     @Override
     protected boolean check(EffectValidation v) {
-        if (ids == null || ids.length == 0) {
-            v.warn("\"Id\" is missing; the effect is ignored");
-            return false;
-        }
-        if (ids.length > v.maxRank()) {
-            v.warn("\"Id\" has " + ids.length + " values but \"MaxRank\" is " + v.maxRank()
-                    + "; the extra values are never used");
-        }
-        boolean usable = true;
-        for (int i = 0; i < ids.length; i++) {
-            String id = ids[i];
-            if (id == null || id.isBlank()) {
-                v.warn("\"Id\" has an empty entry at index " + i + "; the effect is ignored");
-                usable = false;
-            } else if (!v.refs().hasEntityEffect(id)) {
-                v.warn("Unknown entity effect \"" + id + "\" (no Server/Entity/Effects/" + id
-                        + ".json in any pack); the effect is ignored");
-                usable = false;
-            }
-        }
-        return usable;
+        return Ids.check(v, "Id", "entity effect", "Server/Entity/Effects/", ids, v.refs()::hasEntityEffect);
     }
 
     /** {@return the {@code EntityEffect} asset id held at a rank, the last one repeating; rank counts from 1} */
     public String idAt(int rank) {
-        return ids[Math.max(0, Math.min(rank, ids.length) - 1)];
+        return Ids.at(ids, rank);
     }
 
     /** {@return every id the effect can hold, in rank order, without repeats} */

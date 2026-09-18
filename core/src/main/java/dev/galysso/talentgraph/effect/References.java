@@ -1,11 +1,14 @@
 package dev.galysso.talentgraph.effect;
 
 import com.hypixel.hytale.assetstore.AssetRegistry;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.UnarmedInteractions;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 
+import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
@@ -55,6 +58,18 @@ public interface References {
         public Set<String> itemsWithTag(int tagIndex) {
             return Item.getAssetMap().getKeysForTag(tagIndex);
         }
+
+        @Override
+        public String itemRootInteraction(String itemId, InteractionType slot) {
+            Item item = Item.getAssetMap().getAsset(itemId);
+            return item == null ? null : item.getInteractions().get(slot);
+        }
+
+        @Override
+        public String unarmedRootInteraction(InteractionType slot) {
+            UnarmedInteractions unarmed = UnarmedInteractions.getAssetMap().getAsset(UnarmedInteractions.DEFAULT_UNARMED_ID);
+            return unarmed == null ? null : unarmed.getInteractions().get(slot);
+        }
     };
 
     /** {@return whether an {@code EntityStatType} of this id is loaded} */
@@ -78,4 +93,16 @@ public interface References {
 
     /** {@return the ids of the items carrying a tag index, empty if none} */
     Set<String> itemsWithTag(int tagIndex);
+
+    /**
+     * {@return the root interaction an item runs on a slot, or null} Every
+     * item is completed with the unarmed defaults at load, so a slot the
+     * item does not write is the same as {@link #unarmedRootInteraction}.
+     */
+    @Nullable
+    String itemRootInteraction(String itemId, InteractionType slot);
+
+    /** {@return the root interaction of the unarmed defaults ({@code "Empty"}) on a slot, or null} */
+    @Nullable
+    String unarmedRootInteraction(InteractionType slot);
 }

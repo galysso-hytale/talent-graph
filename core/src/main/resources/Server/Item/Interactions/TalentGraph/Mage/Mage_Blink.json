@@ -1,0 +1,36 @@
+{
+  "$Comment": "Blink: 4 stamina (of a vanilla maximum of 10) for a short forward dash, invulnerable for its duration (vanilla Dagger_Dash effect).",
+  "Type": "StatsCondition",
+  "Costs": { "Stamina": 4 },
+  "Failed": "TalentGraph_NoStamina",
+  "Next": {
+    "Type": "Serial",
+    "Interactions": [
+      {
+        "Type": "ChangeStat",
+        "StatModifiers": { "Stamina": -4 }
+      },
+      {
+        "Type": "ApplyEffect",
+        "EffectId": "Dagger_Dash"
+      },
+      {
+        "Type": "ApplyForce",
+        "RunTime": 0.2,
+        "Direction": { "X": 0, "Y": 0.5, "Z": -6 },
+        "AdjustVertical": true,
+        "WaitForGround": false,
+        "Force": 12,
+        "VelocityConfig": {
+          "AirResistance": 0.99,
+          "AirResistanceMax": 0.98,
+          "GroundResistance": 0.94,
+          "GroundResistanceMax": 0.82,
+          "Threshold": 3.0,
+          "Style": "Linear"
+        },
+        "ChangeVelocityType": "Set"
+      }
+    ]
+  }
+}

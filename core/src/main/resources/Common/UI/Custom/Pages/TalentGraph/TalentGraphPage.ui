@@ -48,9 +48,32 @@ $C.@PageOverlay {
         Anchor: (Height: 32);
         Padding: (Horizontal: 12);
 
+        // Previous / next graph, by id; the boxes are shown by the server
+        // only when several graphs are registered.
+        Group #PrevGraphBox {
+          Visible: false;
+          Anchor: (Width: 32);
+          $C.@SmallSecondaryTextButton #PrevGraph {
+            @Text = "<";
+            @Anchor = Anchor(Width: 32);
+            Padding: (Horizontal: 0);
+          }
+        }
+
         Label #GraphName {
-          Style: (...@HeaderStyle, TextColor: #89899f);
+          Style: (...@HeaderStyle, TextColor: #89899f, HorizontalAlignment: Center);
+          Anchor: (Width: 220);
           Text: "";
+        }
+
+        Group #NextGraphBox {
+          Visible: false;
+          Anchor: (Width: 32);
+          $C.@SmallSecondaryTextButton #NextGraph {
+            @Text = ">";
+            @Anchor = Anchor(Width: 32);
+            Padding: (Horizontal: 0);
+          }
         }
 
         Group {

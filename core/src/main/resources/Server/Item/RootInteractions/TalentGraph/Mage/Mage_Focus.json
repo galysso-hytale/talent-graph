@@ -1,0 +1,5 @@
+{
+  "Interactions": [ "Mage_Focus" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Mage_Focus_Click", "Cooldown": 0.35 }
+}

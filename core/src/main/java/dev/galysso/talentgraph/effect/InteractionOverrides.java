@@ -22,7 +22,9 @@ import java.util.Map;
  * is created when a first key is needed and removed when it becomes empty,
  * as vanilla does ({@code InteractionSystems.DropUnresolvedInteractions}).</p>
  *
- * <p>Shared by the equipment refusal and, later, the abilities.</p>
+ * <p>Shared by the equipment refusal and the abilities: the engine merges
+ * both into one wanted map and calls this once per sync, since a partial
+ * call would give back the keys the other partial call wants.</p>
  */
 final class InteractionOverrides {
 

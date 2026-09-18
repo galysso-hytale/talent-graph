@@ -1,0 +1,9 @@
+{
+  "$Comment": "Arcane bolt, rank 3: the vanilla Fireball with one direct hit of 16 and no blast. The parent's explosion is turned off: its EntityDamage defaults to 50 (cause Environment) and would be a second hit.",
+  "Parent": "Fireball",
+  "Damage": 16,
+  "ExplosionConfig": {
+    "DamageEntities": false,
+    "DamageBlocks": false
+  }
+}

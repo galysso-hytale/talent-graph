@@ -17,7 +17,9 @@ import dev.galysso.talentgraph.ui.TalentGraphPage;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -61,8 +63,40 @@ public class TalentsCommand extends AbstractPlayerCommand {
         if (graph == null) {
             return null;
         }
+        return pageOn(api, live, playerRef, graph);
+    }
+
+    private static TalentGraphPage pageOn(TalentGraphApi api, LiveReload live, PlayerRef playerRef, TalentGraph graph) {
         return new TalentGraphPage(playerRef, live.viewFor(playerRef.getUuid(), graph),
-                api.talentsOf(playerRef.getUuid()), null, false);
+                api.talentsOf(playerRef.getUuid()), null, false, new TalentGraphPage.Navigator() {
+            @Override
+            public TalentGraphPage neighbour(PlayerRef playerRef, TalentGraph from, int direction) {
+                List<TalentGraph> graphs = sortedGraphs(api);
+                int index = -1;
+                for (int i = 0; i < graphs.size(); i++) {
+                    if (graphs.get(i).id().equals(from.id())) {
+                        index = i;
+                    }
+                }
+                if (graphs.size() < 2 || index < 0) {
+                    return null;
+                }
+                TalentGraph next = graphs.get(Math.floorMod(index + direction, graphs.size()));
+                return pageOn(api, live, playerRef, next);
+            }
+
+            @Override
+            public boolean hasOthers() {
+                return api.registry().graphs().size() > 1;
+            }
+        });
+    }
+
+    /** {@return the registered graphs by id, the order the header arrows walk} */
+    private static List<TalentGraph> sortedGraphs(TalentGraphApi api) {
+        List<TalentGraph> graphs = new ArrayList<>(api.registry().graphs());
+        graphs.sort(Comparator.comparing(g -> g.id().toString()));
+        return graphs;
     }
 
     @Override

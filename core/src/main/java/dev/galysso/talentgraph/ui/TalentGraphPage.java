@@ -168,6 +168,9 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private static final String GHOST_COLOR = "#e05a5a";
 
     private final TalentGraph graph;
+    /** Where the header arrows lead, or null when the page cannot switch graph. */
+    @Nullable
+    private final Navigator navigator;
     private final GraphLayout layout;
     /** What was wrong with the file; empty for a registered graph opened normally. */
     private final GraphReport report;
@@ -220,11 +223,13 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
      * @param talents   the player's progression
      * @param restore   where a previous page on the same graph was looking, or null to open on the root
      * @param live      whether the page replaces one after a tracked reload
+     * @param navigator the other graphs the header arrows switch to, or null for none
      */
     public TalentGraphPage(@Nonnull PlayerRef playerRef, LoadedGraph view, PlayerTalents talents,
-                           @Nullable Camera.View restore, boolean live) {
+                           @Nullable Camera.View restore, boolean live, @Nullable Navigator navigator) {
         super(playerRef, CustomPageLifetime.CanDismiss, Event.CODEC);
         this.graph = view.graph();
+        this.navigator = navigator;
         this.layout = view.layout();
         this.report = view.report();
         this.live = live;
@@ -275,7 +280,32 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         synchronized (this) {
             current = camera.view();
         }
-        return new TalentGraphPage(playerRef, view, talents, current, live);
+        return new TalentGraphPage(playerRef, view, talents, current, live, navigator);
+    }
+
+    /**
+     * Opens the neighbouring graph in place of this page: the next or the
+     * previous one by id, wrapping around.
+     */
+    private void switchGraph(Ref<EntityStore> ref, Store<EntityStore> store, String direction) {
+        if (navigator == null) {
+            return;
+        }
+        TalentGraphPage next = navigator.neighbour(playerRef, graph, "next".equals(direction) ? 1 : -1);
+        if (next != null) {
+            pages.openCustomPage(ref, store, next);
+        }
+    }
+
+    /** Gives the page the graph next to the one it shows; the command that opens pages knows the registry. */
+    public interface Navigator {
+
+        /** {@return the page on the graph {@code direction} steps from {@code from} by id, or null if it is alone} */
+        @Nullable
+        TalentGraphPage neighbour(PlayerRef playerRef, TalentGraph from, int direction);
+
+        /** {@return whether there is anywhere to go} */
+        boolean hasOthers();
     }
 
     /**
@@ -333,6 +363,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         pages = store.getComponent(ref, Player.getComponentType()).getPageManager();
         commands.append(PAGE_UI);
         commands.set("#GraphName.Text", graph.displayName());
+        if (navigator != null && navigator.hasOthers()) {
+            commands.set("#PrevGraphBox.Visible", true);
+            commands.set("#NextGraphBox.Visible", true);
+            events.addEventBinding(CustomUIEventBindingType.Activating, "#PrevGraph",
+                    EventData.of("Graph", "prev"), false);
+            events.addEventBinding(CustomUIEventBindingType.Activating, "#NextGraph",
+                    EventData.of("Graph", "next"), false);
+        }
         updatePoints(commands);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                 EventData.of("Action", ACTION_CLOSE), false);
@@ -364,6 +402,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             pan(event.toggle, true);
         } else if (event.enter != null) {
             enter(event.enter);
+        } else if (event.graph != null) {
+            switchGraph(ref, store, event.graph);
         }
     }
 
@@ -1023,6 +1063,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 .append(new KeyedCodec<>("Pan", Codec.STRING, false), (e, v) -> e.pan = v, e -> e.pan).add()
                 .append(new KeyedCodec<>("Follow", Codec.STRING, false), (e, v) -> e.toggle = v, e -> e.toggle).add()
                 .append(new KeyedCodec<>("Enter", Codec.STRING, false), (e, v) -> e.enter = v, e -> e.enter).add()
+                .append(new KeyedCodec<>("Graph", Codec.STRING, false), (e, v) -> e.graph = v, e -> e.graph).add()
                 .build();
 
         private String unlock;
@@ -1035,5 +1076,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         private String toggle;
         /** Canvas point under the hovered minimap cell, as {@code "x,y"}. */
         private String enter;
+        /** {@code "prev"} or {@code "next"}: the header arrows. */
+        private String graph;
     }
 }

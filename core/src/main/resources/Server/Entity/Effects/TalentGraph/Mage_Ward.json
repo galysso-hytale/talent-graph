@@ -1,0 +1,25 @@
+{
+  "$Comment": "Ward: half damage from every cause for 4 s. Resistances of an effect are read by exact cause (no inheritance), hence the full list. Stone tint borrowed from the vanilla Stoneskin test effect so the player sees it is on.",
+  "Duration": 4,
+  "OverlapBehavior": "Extend",
+  "ApplicationEffects": {
+    "EntityBottomTint": "#72745e",
+    "EntityTopTint": "#888c8d",
+    "ModelVFXId": "Stoneskin",
+    "Particles": [
+      { "SystemId": "Blue_Beam" }
+    ],
+    "WorldSoundEventId": "SFX_Ice_Break"
+  },
+  "DamageResistance": {
+    "Physical": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Slashing": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Bludgeoning": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Projectile": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Elemental": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Fire": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Ice": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Poison": [ { "Amount": 0.5, "CalculationType": "Percent" } ],
+    "Environmental": [ { "Amount": 0.5, "CalculationType": "Percent" } ]
+  }
+}

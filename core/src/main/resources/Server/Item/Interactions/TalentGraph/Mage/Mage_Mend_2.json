@@ -1,0 +1,28 @@
+{
+  "$Comment": "Mend, rank 2: 20 mana for 30 health.",
+  "Type": "StatsCondition",
+  "Costs": { "Mana": 20 },
+  "Failed": "TalentGraph_NoMana",
+  "Next": {
+    "Type": "Serial",
+    "Interactions": [
+      {
+        "Type": "ChangeStat",
+        "StatModifiers": { "Mana": -20, "Health": 30 },
+        "RunTime": 0.4,
+        "Effects": {
+          "ItemAnimationId": "Interact",
+          "WorldSoundEventId": "SFX_Potion_Drink_Success",
+          "Particles": [
+            {
+              "SystemId": "Potion_Health_Heal",
+              "TargetEntityPart": "Entity",
+              "TargetNodeName": "Hip",
+              "PositionOffset": { "Y": 1.0 }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

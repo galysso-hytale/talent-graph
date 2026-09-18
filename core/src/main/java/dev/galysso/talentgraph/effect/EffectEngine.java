@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.logger.sentry.SkipSentryException;
 import com.hypixel.hytale.protocol.GameMode;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -19,6 +20,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.PlayerTalents;
 import dev.galysso.talentgraph.api.TalentGraphApi;
 
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -32,7 +35,8 @@ import java.util.logging.Level;
  * only when one of its inputs changes: the player enters a world, their
  * ranks move, a graph is loaded or removed, they respawn (vanilla clears
  * entity effects at death), their held item, off hand or armour change, or
- * their game mode does. Offline players are never touched;
+ * their game mode does. The key overrides — equipment refusal and
+ * abilities — are written in one pass, the refusal winning. Offline players are never touched;
  * their save is corrected when they come back.</p>
  */
 public final class EffectEngine {
@@ -82,6 +86,7 @@ public final class EffectEngine {
         PlayerTalents talents = api.talentsOf(playerRef.getUuid());
         int stats = 0;
         int effects = 0;
+        int keys = 0;
         int equipment = 0;
         EntityStatMap statMap = accessor.getComponent(ref, EntityStatMap.getComponentType());
         if (statMap != null) {
@@ -101,13 +106,22 @@ public final class EffectEngine {
             if (controller != null) {
                 effects = EntityEffectSync.sync(ref, accessor, controller, applied, talents::rank, catalog);
             }
+            boolean creative = gameMode == GameMode.Creative;
             EquipmentRules rules = EquipmentRules.compile(catalog, talents::rank);
-            equipment = EquipmentSync.sync(ref, accessor, applied, rules, gameMode == GameMode.Creative, deniedType);
+            HeldItems held = HeldItems.of(ref, accessor);
+            EquipmentSync.Refusal refusal = EquipmentSync.judge(held, rules, creative);
+            // One write for both: the refusal takes its keys from the
+            // abilities. Two partial writes would give back each other's keys.
+            Map<InteractionType, String> overrides = new EnumMap<>(InteractionType.class);
+            overrides.putAll(AbilitySync.desired(held, AbilityRules.compile(catalog, talents::rank)));
+            overrides.putAll(refusal.overrides());
+            keys = InteractionOverrides.sync(ref, accessor, applied, overrides);
+            equipment = EquipmentSync.sync(ref, accessor, refusal, rules, creative, deniedType);
         }
-        if (stats > 0 || effects > 0 || equipment > 0) {
+        if (stats > 0 || effects > 0 || keys > 0 || equipment > 0) {
             logger.at(Level.FINE).log(
-                    "Talent effects synced for %s: %d stat(s), %d entity effect(s), %d equipment change(s)",
-                    playerRef.getUuid(), stats, effects, equipment);
+                    "Talent effects synced for %s: %d stat(s), %d entity effect(s), %d key(s), %d equipment change(s)",
+                    playerRef.getUuid(), stats, effects, keys, equipment);
         }
     }
 

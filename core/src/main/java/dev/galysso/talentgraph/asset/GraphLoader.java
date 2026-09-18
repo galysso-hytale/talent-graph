@@ -21,9 +21,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -247,9 +245,33 @@ public final class GraphLoader {
                 byTalent.put(id, List.copyOf(kept));
             }
         }
-        warnSharedSlots(byTalent);
+        Map<TalentId, Set<TalentId>> ancestors = ancestors();
+        warnAbilities(byTalent, ancestors);
         warnIdleAllows(baseline, byTalent);
-        return new GraphEffects(baseline, byTalent);
+        return new GraphEffects(baseline, byTalent, ancestors);
+    }
+
+    /** The prerequisites of each talent, direct and transitive; the cycles are cut by now. */
+    private Map<TalentId, Set<TalentId>> ancestors() {
+        Map<TalentId, Set<TalentId>> ancestors = new HashMap<>();
+        for (TalentId id : entries.keySet()) {
+            ancestorsOf(id, ancestors);
+        }
+        return ancestors;
+    }
+
+    private Set<TalentId> ancestorsOf(TalentId id, Map<TalentId, Set<TalentId>> ancestors) {
+        Set<TalentId> known = ancestors.get(id);
+        if (known != null) {
+            return known;
+        }
+        Set<TalentId> all = new LinkedHashSet<>();
+        for (TalentId required : entries.get(id).requires) {
+            all.add(required);
+            all.addAll(ancestorsOf(required, ancestors));
+        }
+        ancestors.put(id, all);
+        return all;
     }
 
     /**
@@ -285,24 +307,117 @@ public final class GraphLoader {
     }
 
     /**
-     * Two talents binding the same slot without a held-item condition can
-     * both be unlocked, and then only priority and file order decide. Worth
-     * a warning: the author probably meant one or the other.
+     * What an ability silently replaces, and what it fights over. Three
+     * warnings, none of which drops the effect:
+     * <ol>
+     *   <li>{@code Ability1} without {@code HeldItem}: the signature of
+     *       every weapon is replaced, which is rarely meant.</li>
+     *   <li>{@code Ability2}, {@code Ability3} or {@code Pick} with a
+     *       {@code HeldItem} covering an item that defines its own entry
+     *       for that slot (different from the unarmed default every item
+     *       is completed with): the item's own behaviour is replaced — in
+     *       vanilla, the crossbow's reload on {@code Ability3}. On the
+     *       other slots replacing is the point, no warning.</li>
+     *   <li>Two talents on the same slot, same {@code Priority}, neither
+     *       requiring the other, whose {@code HeldItem} name a common item
+     *       (no {@code HeldItem} names them all): if both are unlocked,
+     *       only file order decides. A power-up is written as ranks or as
+     *       a talent requiring the other; two distinct spells need disjoint
+     *       items or different keys.</li>
+     * </ol>
      */
-    private void warnSharedSlots(Map<TalentId, List<TalentEffect>> byTalent) {
-        Map<InteractionType, TalentId> unconditional = new EnumMap<>(InteractionType.class);
+    private void warnAbilities(Map<TalentId, List<TalentEffect>> byTalent, Map<TalentId, Set<TalentId>> ancestors) {
+        List<Map.Entry<TalentId, AbilityEffect>> abilities = new ArrayList<>();
         for (Map.Entry<TalentId, List<TalentEffect>> e : byTalent.entrySet()) {
             for (TalentEffect effect : e.getValue()) {
-                if (!(effect instanceof AbilityEffect ability) || !ability.heldItem().isEmpty()) {
-                    continue;
-                }
-                TalentId first = unconditional.putIfAbsent(ability.slot(), e.getKey());
-                if (first != null && !first.equals(e.getKey())) {
-                    warning(e.getKey(), "Ability on " + ability.slot() + " without \"HeldItem\", like \""
-                            + entries.get(first).rawId + "\": when both are unlocked, \"Priority\" then file order decide");
+                if (effect instanceof AbilityEffect ability) {
+                    abilities.add(Map.entry(e.getKey(), ability));
+                    warnReplaced(e.getKey(), ability);
                 }
             }
         }
+        for (int i = 0; i < abilities.size(); i++) {
+            for (int j = i + 1; j < abilities.size(); j++) {
+                warnConflict(abilities.get(i), abilities.get(j), ancestors);
+            }
+        }
+    }
+
+    private void warnReplaced(TalentId id, AbilityEffect ability) {
+        InteractionType slot = ability.slot();
+        if (slot == InteractionType.Ability1 && ability.heldItem().isEmpty()) {
+            warning(id, "Ability on Ability1 without \"HeldItem\": it replaces the signature ability of every weapon");
+            return;
+        }
+        if (slot != InteractionType.Ability2 && slot != InteractionType.Ability3 && slot != InteractionType.Pick) {
+            return;
+        }
+        String unarmed = refs.unarmedRootInteraction(slot);
+        Map<String, String> replaced = new LinkedHashMap<>();
+        for (ItemMatcher matcher : ability.heldItem()) {
+            Set<String> items = matcher.isTag() ? refs.itemsWithTag(matcher.tagIndex()) : Set.of(matcher.itemId());
+            for (String item : items) {
+                String own = refs.itemRootInteraction(item, slot);
+                if (own != null && !own.equals(unarmed)) {
+                    replaced.putIfAbsent(item, own);
+                }
+            }
+        }
+        if (replaced.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Ability on ").append(slot).append(" replaces what the item does with it: ");
+        int shown = 0;
+        for (Map.Entry<String, String> e : replaced.entrySet()) {
+            if (shown == 3) {
+                sb.append(", and ").append(replaced.size() - shown).append(" more");
+                break;
+            }
+            if (shown > 0) {
+                sb.append(", ");
+            }
+            sb.append(e.getKey()).append(" (").append(e.getValue()).append(')');
+            shown++;
+        }
+        warning(id, sb.toString());
+    }
+
+    private void warnConflict(Map.Entry<TalentId, AbilityEffect> a, Map.Entry<TalentId, AbilityEffect> b,
+                              Map<TalentId, Set<TalentId>> ancestors) {
+        AbilityEffect first = a.getValue();
+        AbilityEffect second = b.getValue();
+        if (first.slot() != second.slot() || first.priority() != second.priority()) {
+            return;
+        }
+        TalentId talentA = a.getKey();
+        TalentId talentB = b.getKey();
+        if (talentA.equals(talentB) || ancestors.getOrDefault(talentA, Set.of()).contains(talentB)
+                || ancestors.getOrDefault(talentB, Set.of()).contains(talentA)) {
+            return;
+        }
+        String common = commonItem(first.heldItem(), second.heldItem());
+        if (common == null) {
+            return;
+        }
+        warning(talentB, "Ability on " + first.slot() + " " + common + ", like \"" + entries.get(talentA).rawId
+                + "\": if both are unlocked, file order decides. Make one require the other, or give them"
+                + " disjoint \"HeldItem\" or different slots");
+    }
+
+    /** {@return how the two item conditions meet, or null when they never do} */
+    @Nullable
+    private String commonItem(List<ItemMatcher> a, List<ItemMatcher> b) {
+        if (a.isEmpty() || b.isEmpty()) {
+            return a.isEmpty() && b.isEmpty() ? "without \"HeldItem\"" : "with any held item";
+        }
+        for (ItemMatcher mine : a) {
+            for (ItemMatcher theirs : b) {
+                if (mine.overlaps(theirs, refs)) {
+                    return "with \"" + mine.written() + "\"";
+                }
+            }
+        }
+        return null;
     }
 
     // ---- prerequisites ----
