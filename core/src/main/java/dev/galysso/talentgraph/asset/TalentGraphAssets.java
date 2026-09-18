@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import dev.galysso.talentgraph.api.TalentId;
 import dev.galysso.talentgraph.effect.EffectCatalog;
+import dev.galysso.talentgraph.effect.EffectEngine;
 import dev.galysso.talentgraph.effect.References;
 import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
@@ -66,6 +67,7 @@ public final class TalentGraphAssets {
     private final TalentGraphApiImpl api;
     private final GraphLayouts layouts;
     private final EffectCatalog effects;
+    private final EffectEngine engine;
     private final LiveReload live;
     /** Whether every asset pack is loaded, so effect references can be checked. */
     private boolean assetsReady;
@@ -77,11 +79,12 @@ public final class TalentGraphAssets {
     private final ConcurrentMap<String, Path> files = new ConcurrentHashMap<>();
 
     public TalentGraphAssets(HytaleLogger logger, TalentGraphApiImpl api, GraphLayouts layouts,
-                             EffectCatalog effects, LiveReload live) {
+                             EffectCatalog effects, EffectEngine engine, LiveReload live) {
         this.logger = logger;
         this.api = api;
         this.layouts = layouts;
         this.effects = effects;
+        this.engine = engine;
         this.live = live;
     }
 
@@ -193,6 +196,7 @@ public final class TalentGraphAssets {
                 api.removeGraph(graphId);
                 layouts.remove(graphId);
                 effects.remove(graphId);
+                engine.syncAll();
                 live.onRemoved(graphId);
                 logger.at(Level.INFO).log("Talent graph %s removed", graphId);
             }
@@ -222,6 +226,8 @@ public final class TalentGraphAssets {
             api.replaceGraph(result.graph());
             layouts.put(graphId, result.layout());
             effects.put(graphId, result.effects());
+            // Registry and catalog both updated: online players get the new amounts.
+            engine.syncAll();
             logger.at(Level.INFO).log("Talent graph %s loaded (%d talents%s)", graphId,
                     result.graph().talents().size(),
                     report.isEmpty() ? "" : ", " + report.summary());

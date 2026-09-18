@@ -26,6 +26,8 @@ final class PlayerTalentsImpl implements PlayerTalents {
     private final UUID playerId;
     private final TalentRegistryImpl registry;
     private final Consumer<TalentUnlockedEvent> unlockedSink;
+    /** Told, outside the lock, after a mutation that may change what the player is granted. */
+    private final Consumer<UUID> ranksChangedSink;
 
     // Guarded by `this`: unlocking reads the ranks, checks affordability and
     // writes back, and that sequence must not interleave across threads.
@@ -33,10 +35,11 @@ final class PlayerTalentsImpl implements PlayerTalents {
     private int availablePoints;
 
     PlayerTalentsImpl(UUID playerId, TalentRegistryImpl registry,
-                      Consumer<TalentUnlockedEvent> unlockedSink) {
+                      Consumer<TalentUnlockedEvent> unlockedSink, Consumer<UUID> ranksChangedSink) {
         this.playerId = Objects.requireNonNull(playerId, "playerId");
         this.registry = registry;
         this.unlockedSink = unlockedSink;
+        this.ranksChangedSink = ranksChangedSink;
     }
 
     @Override
@@ -84,6 +87,7 @@ final class PlayerTalentsImpl implements PlayerTalents {
             event = new TalentUnlockedEvent(playerId, id, nextRank, cost);
         }
         // Fired outside the lock so a listener cannot deadlock against us.
+        ranksChangedSink.accept(playerId);
         unlockedSink.accept(event);
         return event.newRank();
     }
@@ -98,17 +102,21 @@ final class PlayerTalentsImpl implements PlayerTalents {
     }
 
     @Override
-    public synchronized int reset(TalentId graphId) {
-        TalentGraph graph = registry.graph(graphId)
-                .orElseThrow(() -> new TalentException("Unknown talent graph: " + graphId));
-        int refunded = 0;
-        for (Talent talent : graph.talents()) {
-            Integer rank = ranks.remove(talent.id());
-            for (int i = 1; rank != null && i <= rank; i++) {
-                refunded += talent.costOfRank(i);
+    public int reset(TalentId graphId) {
+        int refunded;
+        synchronized (this) {
+            TalentGraph graph = registry.graph(graphId)
+                    .orElseThrow(() -> new TalentException("Unknown talent graph: " + graphId));
+            refunded = 0;
+            for (Talent talent : graph.talents()) {
+                Integer rank = ranks.remove(talent.id());
+                for (int i = 1; rank != null && i <= rank; i++) {
+                    refunded += talent.costOfRank(i);
+                }
             }
+            availablePoints += refunded;
         }
-        availablePoints += refunded;
+        ranksChangedSink.accept(playerId);
         return refunded;
     }
 
@@ -118,6 +126,10 @@ final class PlayerTalentsImpl implements PlayerTalents {
      * max rank dropped below the rank reached, refunds the ranks lost at
      * the prices of the previous version. A talent whose cost merely
      * changed keeps its rank, the points already spent staying spent.
+     *
+     * <p>Does not tell the ranks-changed sink: a graph replacement is
+     * always followed by a sync of every online player once the effect
+     * catalog is updated too, which is what the effects need.</p>
      *
      * @param previous    the version the ranks were earned in
      * @param replacement the version now registered

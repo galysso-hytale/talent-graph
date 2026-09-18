@@ -86,9 +86,32 @@ Moves the maximum (or minimum) of an entity stat.
 | `Calculation` | no | `Additive`: the amount is added. `Multiplicative`: the bound is multiplied. | `Additive` |
 | `Target` | no | `Max` or `Min`: which bound moves. | `Max` |
 
-The modifier is applied to the stat's bound as a Hytale stat modifier,
-keyed by the talent, next to those of armour and effects; it is replaced
-when the rank changes and removed when the talent is reset.
+### How it is applied
+
+The amounts of every ranked talent, across all loaded graphs, that move
+the same bound of the same stat are folded into **one** Hytale stat
+modifier: additive amounts add up, multiplicative amounts multiply
+(`0.8` and `0.9` give `×0.72`). The result sits next to the modifiers of
+armour, effects and weapons, under a fixed key per bound and calculation
+(`Talent_Max_ADDITIVE`, `Talent_Max_MULTIPLICATIVE`, `Talent_Min_ADDITIVE`,
+`Talent_Min_MULTIPLICATIVE`), and Hytale computes the bound as it always
+does: `(base + all additives) × sum of all multiplicatives`.
+
+- **Hytale adds multiplicatives across sources.** A talent at `×1.1` and a
+  fruit buff at `×1.1` give `×2.2`, not `×1.21`; that is how the game
+  combines armour, effects and weapons too, and this mod does not change
+  it. Between talents the product rule above applies.
+- Raising `Max` raises the current value by the same amount, so what is
+  missing stays missing (20/100 becomes 70/150): a health talent gives
+  its health at once, but is never a free heal. Lowering `Max` clamps the
+  current value. Unlike armour, which leaves the bar where it was.
+- The modifiers are saved with the player, as Hytale saves every stat
+  modifier. They are brought back in line whenever the player enters a
+  world, unlocks or resets a talent, or a graph file is loaded, reloaded
+  or removed — never on each stat read. A player who is offline when a
+  graph changes is corrected the moment they come back. If the mod is
+  uninstalled, the `Talent_*` keys stay in the saves and keep applying;
+  reset every player before removing it.
 
 ### Vanilla stats
 

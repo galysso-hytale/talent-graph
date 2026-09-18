@@ -7,6 +7,9 @@
             "Icon": "Armor_Iron_Chest",
             "MaxRank": 3,
             "Cost": [1, 2, 3],
+            "Effects": [
+                { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] }
+            ],
             "X": 96,
             "Y": 96
         },

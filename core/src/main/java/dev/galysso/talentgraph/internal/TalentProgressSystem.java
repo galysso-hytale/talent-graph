@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.TalentId;
+import dev.galysso.talentgraph.effect.EffectEngine;
 
 import javax.annotation.Nonnull;
 import java.util.HashMap;
@@ -42,12 +43,14 @@ public final class TalentProgressSystem extends RefSystem<EntityStore> {
 
     private final HytaleLogger logger;
     private final TalentGraphApiImpl api;
+    private final EffectEngine effects;
     private final ComponentType<EntityStore, TalentProgressComponent> componentType;
 
-    public TalentProgressSystem(HytaleLogger logger, TalentGraphApiImpl api,
+    public TalentProgressSystem(HytaleLogger logger, TalentGraphApiImpl api, EffectEngine effects,
                                 ComponentType<EntityStore, TalentProgressComponent> componentType) {
         this.logger = logger;
         this.api = api;
+        this.effects = effects;
         this.componentType = componentType;
     }
 
@@ -80,6 +83,9 @@ public final class TalentProgressSystem extends RefSystem<EntityStore> {
         component.bind(talents);
         logger.at(Level.INFO).log("Talent progression loaded for %s: %d points, %d talent(s) ranked",
                 uuid, component.savedPoints(), ranks.size());
+        // Always, not only after a change: the persisted modifiers may be
+        // stale if a graph was edited while the player was away.
+        effects.sync(ref, store);
     }
 
     @Override

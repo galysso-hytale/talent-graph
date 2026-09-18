@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -27,6 +28,8 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
     private final TalentRegistryImpl registry = new TalentRegistryImpl();
     private final Map<UUID, PlayerTalentsImpl> players = new ConcurrentHashMap<>();
     private final List<TalentListener> listeners = new CopyOnWriteArrayList<>();
+    // Set once by the plugin, after the effect engine exists; a no-op until then.
+    private volatile Consumer<UUID> ranksChangedSink = playerId -> { };
 
     @Override
     public TalentRegistry registry() {
@@ -44,7 +47,17 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
     PlayerTalentsImpl progressionOf(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return players.computeIfAbsent(playerId,
-                id -> new PlayerTalentsImpl(id, registry, this::fireTalentUnlocked));
+                id -> new PlayerTalentsImpl(id, registry, this::fireTalentUnlocked, this::fireRanksChanged));
+    }
+
+    /**
+     * Sets what happens after a player's ranks were mutated by an unlock or
+     * a reset, once the mutation is visible: the effect engine syncs them.
+     *
+     * @param sink called with the player identifier, outside any lock
+     */
+    public void onRanksChanged(Consumer<UUID> sink) {
+        this.ranksChangedSink = Objects.requireNonNull(sink, "sink");
     }
 
     @Override
@@ -97,6 +110,10 @@ public final class TalentGraphApiImpl implements TalentGraphApi {
      */
     public void forget(UUID playerId) {
         players.remove(playerId);
+    }
+
+    private void fireRanksChanged(UUID playerId) {
+        ranksChangedSink.accept(playerId);
     }
 
     private void fireTalentUnlocked(TalentUnlockedEvent event) {

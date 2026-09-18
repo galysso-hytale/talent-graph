@@ -8,6 +8,7 @@ import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
 import dev.galysso.talentgraph.asset.TalentGraphAssets;
 import dev.galysso.talentgraph.command.TalentsCommand;
 import dev.galysso.talentgraph.effect.EffectCatalog;
+import dev.galysso.talentgraph.effect.EffectEngine;
 import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.internal.TalentProgressComponent;
@@ -25,6 +26,7 @@ public class TalentGraphPlugin extends JavaPlugin {
     private final TalentGraphApiImpl api = new TalentGraphApiImpl();
     private final GraphLayouts layouts = new GraphLayouts();
     private final EffectCatalog effects = new EffectCatalog();
+    private final EffectEngine engine = new EffectEngine(getLogger(), api, effects);
     private final LiveReload live = new LiveReload(api, layouts, effects);
 
     public TalentGraphPlugin(@Nonnull JavaPluginInit init) {
@@ -36,11 +38,12 @@ public class TalentGraphPlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
-        TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, effects, live);
+        api.onRanksChanged(engine::sync);
+        TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, effects, engine, live);
         assets.register(this);
         var progressType = getEntityStoreRegistry().registerComponent(
                 TalentProgressComponent.class, "TalentGraphProgress", TalentProgressComponent.CODEC);
-        getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, progressType));
+        getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, engine, progressType));
         getCommandRegistry().registerCommand(
                 new TalentsCommand("talents", "Open the talent page", api, live, assets));
         // The page as an interaction target, the native way to open one from
