@@ -6,6 +6,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.logger.sentry.SkipSentryException;
+import com.hypixel.hytale.protocol.GameMode;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
@@ -28,8 +30,9 @@ import java.util.logging.Level;
  *
  * <p>Nothing is replayed when a stat is read or on a tick. A sync runs
  * only when one of its inputs changes: the player enters a world, their
- * ranks move, a graph is loaded or removed, or they respawn (vanilla
- * clears entity effects at death). Offline players are never touched;
+ * ranks move, a graph is loaded or removed, they respawn (vanilla clears
+ * entity effects at death), their held item, off hand or armour change, or
+ * their game mode does. Offline players are never touched;
  * their save is corrected when they come back.</p>
  */
 public final class EffectEngine {
@@ -38,13 +41,16 @@ public final class EffectEngine {
     private final TalentGraphApi api;
     private final EffectCatalog catalog;
     private final ComponentType<EntityStore, AppliedEffectsComponent> appliedType;
+    private final ComponentType<EntityStore, HeldItemDenied> deniedType;
 
     public EffectEngine(HytaleLogger logger, TalentGraphApi api, EffectCatalog catalog,
-                        ComponentType<EntityStore, AppliedEffectsComponent> appliedType) {
+                        ComponentType<EntityStore, AppliedEffectsComponent> appliedType,
+                        ComponentType<EntityStore, HeldItemDenied> deniedType) {
         this.logger = logger;
         this.api = api;
         this.catalog = catalog;
         this.appliedType = appliedType;
+        this.deniedType = deniedType;
     }
 
     /**
@@ -55,6 +61,20 @@ public final class EffectEngine {
      * @param accessor the store, or the command buffer of the system calling
      */
     public void sync(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        Player player = accessor.getComponent(ref, Player.getComponentType());
+        sync(ref, accessor, player == null ? GameMode.Adventure : player.getGameMode());
+    }
+
+    /**
+     * Reconciles one player entity as if in a given game mode: the one
+     * they are about to be in, when called from the change event, which
+     * fires before the mode is written.
+     *
+     * @param ref      the player entity
+     * @param accessor the store, or the command buffer of the system calling
+     * @param gameMode the mode the equipment rules are judged in
+     */
+    public void sync(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor, GameMode gameMode) {
         PlayerRef playerRef = accessor.getComponent(ref, PlayerRef.getComponentType());
         if (playerRef == null) {
             return;
@@ -62,14 +82,14 @@ public final class EffectEngine {
         PlayerTalents talents = api.talentsOf(playerRef.getUuid());
         int stats = 0;
         int effects = 0;
+        int equipment = 0;
         EntityStatMap statMap = accessor.getComponent(ref, EntityStatMap.getComponentType());
         if (statMap != null) {
             stats = StatSync.sync(statMap, talents::rank, catalog, EntityStatType.getAssetMap()::getIndex);
         }
-        EffectControllerComponent controller = accessor.getComponent(ref, EffectControllerComponent.getComponentType());
-        // A dead player has no effects, vanilla saw to that; the respawn
-        // sync puts ours back once the corpse is a player again.
-        if (controller != null && accessor.getComponent(ref, DeathComponent.getComponentType()) == null) {
+        // A dead player has no effects, vanilla saw to that, and no use for
+        // equipment; the respawn sync does both once the corpse is a player again.
+        if (accessor.getComponent(ref, DeathComponent.getComponentType()) == null) {
             AppliedEffectsComponent applied = accessor.getComponent(ref, appliedType);
             if (applied == null) {
                 // First sync of a player without the record (new, or from an
@@ -77,11 +97,17 @@ public final class EffectEngine {
                 // command buffer; a store outside a system would do as well.
                 applied = accessor.ensureAndGetComponent(ref, appliedType);
             }
-            effects = EntityEffectSync.sync(ref, accessor, controller, applied, talents::rank, catalog);
+            EffectControllerComponent controller = accessor.getComponent(ref, EffectControllerComponent.getComponentType());
+            if (controller != null) {
+                effects = EntityEffectSync.sync(ref, accessor, controller, applied, talents::rank, catalog);
+            }
+            EquipmentRules rules = EquipmentRules.compile(catalog, talents::rank);
+            equipment = EquipmentSync.sync(ref, accessor, applied, rules, gameMode == GameMode.Creative, deniedType);
         }
-        if (stats > 0 || effects > 0) {
-            logger.at(Level.FINE).log("Talent effects synced for %s: %d stat(s), %d entity effect(s) changed",
-                    playerRef.getUuid(), stats, effects);
+        if (stats > 0 || effects > 0 || equipment > 0) {
+            logger.at(Level.FINE).log(
+                    "Talent effects synced for %s: %d stat(s), %d entity effect(s), %d equipment change(s)",
+                    playerRef.getUuid(), stats, effects, equipment);
         }
     }
 

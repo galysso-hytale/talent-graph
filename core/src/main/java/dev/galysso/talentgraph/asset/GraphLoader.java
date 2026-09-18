@@ -10,6 +10,8 @@ import dev.galysso.talentgraph.api.TalentId;
 import dev.galysso.talentgraph.effect.AbilityEffect;
 import dev.galysso.talentgraph.effect.EffectValidation;
 import dev.galysso.talentgraph.effect.EquipmentBaseline;
+import dev.galysso.talentgraph.effect.EquipmentEffect;
+import dev.galysso.talentgraph.effect.ItemMatcher;
 import dev.galysso.talentgraph.effect.References;
 import dev.galysso.talentgraph.effect.TalentEffect;
 import dev.galysso.talentgraph.ui.AutoLayout;
@@ -246,7 +248,40 @@ public final class GraphLoader {
             }
         }
         warnSharedSlots(byTalent);
+        warnIdleAllows(baseline, byTalent);
         return new GraphEffects(baseline, byTalent);
+    }
+
+    /**
+     * An {@code Allow} only opens what something closes: the baseline's
+     * {@code Forbidden} or a {@code Forbid} talent. One that names no item
+     * any of those names does nothing, and the author probably expected
+     * it to restrict. Judged within this graph: a {@code Forbid} of another
+     * graph is not seen here.
+     */
+    private void warnIdleAllows(EquipmentBaseline baseline, Map<TalentId, List<TalentEffect>> byTalent) {
+        List<ItemMatcher> closing = new ArrayList<>(baseline.forbidden());
+        for (List<TalentEffect> effects : byTalent.values()) {
+            for (TalentEffect effect : effects) {
+                if (effect instanceof EquipmentEffect e && e.mode() == EquipmentEffect.Mode.FORBID) {
+                    closing.addAll(e.items());
+                }
+            }
+        }
+        for (Map.Entry<TalentId, List<TalentEffect>> e : byTalent.entrySet()) {
+            for (TalentEffect effect : e.getValue()) {
+                if (!(effect instanceof EquipmentEffect allow) || allow.mode() != EquipmentEffect.Mode.ALLOW) {
+                    continue;
+                }
+                for (ItemMatcher matcher : allow.items()) {
+                    if (closing.stream().noneMatch(c -> matcher.overlaps(c, refs))) {
+                        warning(e.getKey(), "Equipment \"Allow\" of \"" + matcher.written()
+                                + "\": nothing forbids it (no \"Forbidden\" baseline or \"Forbid\" talent covers it),"
+                                + " so the effect changes nothing");
+                    }
+                }
+            }
+        }
     }
 
     /**

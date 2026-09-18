@@ -1,6 +1,7 @@
 package dev.galysso.talentgraph;
 
 import com.hypixel.hytale.server.core.io.adapter.PacketAdapters;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.server.OpenCustomUIInteraction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
@@ -8,8 +9,12 @@ import dev.galysso.talentgraph.api.internal.TalentGraphApiHolder;
 import dev.galysso.talentgraph.asset.TalentGraphAssets;
 import dev.galysso.talentgraph.command.TalentsCommand;
 import dev.galysso.talentgraph.effect.AppliedEffectsComponent;
+import dev.galysso.talentgraph.effect.DeniedItemStatsSystem;
 import dev.galysso.talentgraph.effect.EffectCatalog;
 import dev.galysso.talentgraph.effect.EffectEngine;
+import dev.galysso.talentgraph.effect.EquipmentTriggerSystems;
+import dev.galysso.talentgraph.effect.HeldItemDenied;
+import dev.galysso.talentgraph.effect.NotifyInteraction;
 import dev.galysso.talentgraph.effect.RespawnSyncSystem;
 import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
@@ -41,7 +46,9 @@ public class TalentGraphPlugin extends JavaPlugin {
     protected void setup() {
         var appliedType = getEntityStoreRegistry().registerComponent(
                 AppliedEffectsComponent.class, "TalentGraphApplied", AppliedEffectsComponent.CODEC);
-        EffectEngine engine = new EffectEngine(getLogger(), api, effects, appliedType);
+        // No codec: a transient marker, put back by the sync at world entry.
+        var deniedType = getEntityStoreRegistry().registerComponent(HeldItemDenied.class, HeldItemDenied::new);
+        EffectEngine engine = new EffectEngine(getLogger(), api, effects, appliedType, deniedType);
         api.onRanksChanged(engine::sync);
         TalentGraphAssets assets = new TalentGraphAssets(getLogger(), api, layouts, effects, engine, live);
         assets.register(this);
@@ -49,6 +56,13 @@ public class TalentGraphPlugin extends JavaPlugin {
                 TalentProgressComponent.class, "TalentGraphProgress", TalentProgressComponent.CODEC);
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, engine, progressType));
         getEntityStoreRegistry().registerSystem(new RespawnSyncSystem(engine));
+        getEntityStoreRegistry().registerSystem(new DeniedItemStatsSystem(deniedType));
+        getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.ActiveSlot(engine));
+        getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.SectionChanged(engine));
+        getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.GameModeChanged(engine));
+        // The refusal chain ends with a HUD notification, which no vanilla
+        // interaction can address to one player.
+        Interaction.CODEC.register(NotifyInteraction.TYPE, NotifyInteraction.class, NotifyInteraction.CODEC);
         getCommandRegistry().registerCommand(
                 new TalentsCommand("talents", "Open the talent page", api, live, assets));
         // The page as an interaction target, the native way to open one from

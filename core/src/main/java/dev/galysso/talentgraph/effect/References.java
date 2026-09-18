@@ -6,6 +6,8 @@ import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 
+import java.util.Set;
+
 /**
  * What the server knows, as far as effects need it. One implementation
  * reads the live asset maps; the interface exists so the loader can be
@@ -48,6 +50,11 @@ public interface References {
             }
             return index;
         }
+
+        @Override
+        public Set<String> itemsWithTag(int tagIndex) {
+            return Item.getAssetMap().getKeysForTag(tagIndex);
+        }
     };
 
     /** {@return whether an {@code EntityStatType} of this id is loaded} */
@@ -68,4 +75,7 @@ public interface References {
      * {@code "Weapon"}, {@code "Type=Weapon"}, {@code "Family=Sword"}.
      */
     int itemTagIndex(String tag);
+
+    /** {@return the ids of the items carrying a tag index, empty if none} */
+    Set<String> itemsWithTag(int tagIndex);
 }

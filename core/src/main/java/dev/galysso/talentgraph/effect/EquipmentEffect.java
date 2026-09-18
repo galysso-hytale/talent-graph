@@ -16,9 +16,11 @@ import java.util.List;
  * { "Type": "Equipment", "Mode": "Forbid", "Items": ["Family=Shortbow"], "Priority": 1 }
  * }</pre>
  *
- * <p>Resolution for one item: rules of unlocked talents beat the baseline;
- * between talents the highest {@code "Priority"} wins (default 0); on a tie
- * {@code Forbid} wins.</p>
+ * <p>Resolution for one item ({@link EquipmentRules}): rules of unlocked
+ * talents beat the baseline; between talents the highest {@code "Priority"}
+ * wins (default 0); on a tie a rule naming the item by id beats one naming
+ * a tag; still tied, {@code Forbid} wins. An {@code Allow} forbids nothing
+ * by itself: it opens what the baseline or a {@code Forbid} closes.</p>
  */
 public final class EquipmentEffect extends TalentEffect {
 

@@ -278,10 +278,24 @@ unioned.
 | `Items` | yes | Item list, at least one entry that resolves. | — |
 | `Priority` | no | Integer. Between talents, the highest wins. | 0 |
 
-Resolution for one item: rules of unlocked talents beat the baseline;
-between talents the highest `Priority` wins; on a tie, `Forbid` wins (a
-restriction is the stronger commitment — give the allowing talent a
-`Priority` if you mean the opposite).
+Resolution for one item, in order:
+
+1. Among the rules of unlocked talents that name the item (all graphs,
+   `FromRank` respected), the highest `Priority` wins, `Allow` or `Forbid`
+   alike — a talent meant to override everything gets a high priority.
+2. On a tie, a rule naming the item **by id** beats one naming a **tag**
+   (`Armor_Iron_Chest` beats `Family=Iron`); tags are flat, there is no
+   other level of specificity.
+3. Still tied, `Forbid` wins: a restriction is the stronger commitment.
+   Give the allowing talent a `Priority` if you mean the opposite.
+4. No talent rule names the item: the baseline speaks, `Allowed` then
+   `Forbidden`.
+5. Nothing names it: the item is free.
+
+An `Allow` forbids nothing by itself; it opens what the baseline or a
+`Forbid` talent closes. An `Allow` that names nothing any `Forbidden`
+entry or `Forbid` talent of the same graph names gets a warning: it
+changes nothing. (A `Forbid` in *another* graph is not seen by that check.)
 
 ### Item lists
 
@@ -307,6 +321,76 @@ of that kind, whatever its material):
 Pitfalls: battleaxes carry `Type=Weapon` but **no family tag** — list them
 by id. Avoid the bare key `Type` or `Family` as an entry: it matches every
 tagged item.
+
+### What forbidden means
+
+Possession is never touched: a forbidden item can be picked up, carried in
+the hotbar, sold, dropped or given. Using it is what is blocked:
+
+- **In hand or in the off hand**: the item stays where it is, visible, and
+  its five keys are redirected to a refusal that shows a short HUD
+  notification (`Primary`, `Ability1`–`Ability3` follow the item in hand;
+  `Secondary` follows the off-hand item when there is one, since right
+  click runs it, otherwise the item in hand). No swing, no arrow, no
+  ability. The hotbar is never reordered.
+- **Its stat modifiers are stripped**: a forbidden sword or bow fills no
+  signature energy, a forbidden crossbow gives no ammo — the item is worn
+  like a stick. Vanilla's own armour and effect modifiers are untouched.
+- **Armour**: a forbidden piece is refused at the slot, by drag or by
+  shift-click, with the same notification. A piece already worn when it
+  becomes forbidden (a reset, a graph edit) is taken off and put back in
+  the bag following the player's pickup settings; if the bag is full it is
+  dropped on the ground. Nothing is ever destroyed.
+- **Creative mode** is exempt: no restriction at all, and the rules come
+  back on the return to adventure.
+- **What cannot be done**: greying the item out in the inventory. Item
+  tooltips are built on the client from the assets, the same for every
+  player. The player learns of a restriction at the refusal and in the
+  talent's tooltip.
+
+### The refusal message
+
+The refused keys run the root interaction `TalentGraph_Denied`
+(`Server/Item/RootInteractions/TalentGraph/TalentGraph_Denied.json`),
+which has a 1.5 s cooldown so a held click does not flood, and runs
+`Server/Item/Interactions/TalentGraph/TalentGraph_Denied.json`:
+
+```json
+{ "Type": "TalentGraph_Notify", "Message": "Your talents do not let you use this" }
+```
+
+`TalentGraph_Notify` is an interaction type this mod adds: a HUD
+notification to the player running it (vanilla's `ShowEventTitle`
+addresses a whole world, `SendMessage` is a chat line). To change the
+text, or replace it with a sound, an animation or anything else, ship a
+pack with a file at the same path: it overrides this one. The armour
+notification ("Your talents do not let you wear …") is not an
+interaction and is not replaceable.
+
+### How it is applied
+
+The engine reconciles the player at world entry, at every rank change,
+after a graph reload, on respawn, and when the item in hand, the off-hand
+item, the armour or the game mode change. Each pass:
+
+- Resolves the item in hand and in the off hand, and writes the refusal
+  under the player's `Interactions` component (the same one vanilla and
+  other plugins use to override keys), remembering in
+  `TalentGraphApplied.Interactions` which keys it wrote. It only takes a
+  key that is free or already its own, and only gives back one that still
+  holds what it wrote; a key of its own rewritten by someone else is
+  forgotten, not touched. The component is created on the first key and
+  removed when it becomes empty.
+- Marks the player (`HeldItemDenied`, transient) so that a ticking system
+  strips the item's stat modifiers right after vanilla recomputes them,
+  before anything is sent to the client.
+- Replaces the four armour slot filters with vanilla's check plus the
+  rules, then returns the worn pieces the rules refuse.
+
+The `Interactions` override is saved with the player: after a crash the
+refusal stays in place until the next world entry corrects it. With the
+mod removed, the server drops the override itself, as the root interaction
+it names no longer exists.
 
 ## Ability
 
