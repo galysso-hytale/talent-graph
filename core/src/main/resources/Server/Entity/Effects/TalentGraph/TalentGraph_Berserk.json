@@ -1,0 +1,9 @@
+{
+  "$Comment": "Visible capstone: a HUD icon, a red tint, half the knockback taken.",
+  "Infinite": true,
+  "StatusEffectIcon": "UI/StatusEffects/Burn.png",
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff5a3c",
+    "KnockbackMultiplier": 0.5
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$Comment": "Overrides the vanilla file of the same name. 'super' inherits everything from it; only Next is replaced, so every sword whose item inherits this damage (they all do, copper included) gets the branch. The first entries are vanilla's own Next (DamageEntityParent): the hit flash and the regeneration potions cancelled on hit.",
+  "Parent": "super",
+  "Next": {
+    "Type": "Serial",
+    "Interactions": [
+      {
+        "Type": "ApplyEffect",
+        "EffectId": "Red_Flash",
+        "Entity": "Target"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Health_Regen_Lesser"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Health_Regen_Small"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Health_Regen"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Health_Regen_Greater"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Health_Regen_Large"
+      },
+      {
+        "Type": "ClearEntityEffect",
+        "Entity": "Target",
+        "EntityEffectId": "Potion_Stamina_Regen"
+      },
+      {
+        "$Comment": "The talent: the attacker holds the flag -> the target burns.",
+        "Type": "EffectCondition",
+        "EntityEffectIds": ["Example_Flaming_Blade"],
+        "Match": "All",
+        "Next": {
+          "Type": "ApplyEffect",
+          "EffectId": "Burn",
+          "Entity": "Target"
+        }
+      }
+    ]
+  }
+}

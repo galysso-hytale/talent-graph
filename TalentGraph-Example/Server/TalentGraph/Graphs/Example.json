@@ -9,7 +9,8 @@
             "MaxRank": 3,
             "Cost": [1, 2, 3],
             "Effects": [
-                { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] }
+                { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] },
+                { "Type": "EntityEffect", "Id": "Example_Vigor_Regen", "FromRank": 2 }
             ],
             "X": 764,
             "Y": 414
@@ -24,11 +25,14 @@
             "Y": 214
         },
         {
-            "Id": "cleave",
-            "Name": "Cleave",
+            "Id": "flaming_blade",
+            "Name": "Flaming Blade",
             "Icon": "Weapon_Sword_Copper",
             "Cost": [2],
             "Requires": ["vigor"],
+            "Effects": [
+                { "Type": "EntityEffect", "Id": "Example_Flaming_Blade" }
+            ],
             "X": 1064,
             "Y": 614
         },
@@ -38,7 +42,7 @@
             "Icon": "Weapon_Sword_Iron",
             "MaxRank": 2,
             "Cost": [3, 4],
-            "Requires": ["spark", "cleave"],
+            "Requires": ["spark", "flaming_blade"],
             "X": 1364,
             "Y": 414
         }

@@ -85,7 +85,7 @@ public final class TalentProgressSystem extends RefSystem<EntityStore> {
                 uuid, component.savedPoints(), ranks.size());
         // Always, not only after a change: the persisted modifiers may be
         // stale if a graph was edited while the player was away.
-        effects.sync(ref, store);
+        effects.sync(ref, commandBuffer);
     }
 
     @Override

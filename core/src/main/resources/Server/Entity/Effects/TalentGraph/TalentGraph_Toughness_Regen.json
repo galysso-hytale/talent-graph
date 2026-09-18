@@ -1,0 +1,8 @@
+{
+  "$Comment": "Passive: +1 health every 2 seconds. No StatusEffectIcon, so nothing shows in the HUD.",
+  "Infinite": true,
+  "StatModifiers": {
+    "Health": 1
+  },
+  "DamageCalculatorCooldown": 2
+}

@@ -8,7 +8,8 @@
             "MaxRank": 3,
             "Cost": [1, 2, 3],
             "Effects": [
-                { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] }
+                { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] },
+                { "Type": "EntityEffect", "Id": "TalentGraph_Toughness_Regen", "FromRank": 2 }
             ],
             "X": 96,
             "Y": 96
@@ -27,6 +28,9 @@
             "Name": "Berserk",
             "Cost": [3],
             "Requires": ["cleave"],
+            "Effects": [
+                { "Type": "EntityEffect", "Id": "TalentGraph_Berserk" }
+            ],
             "X": 420,
             "Y": 520
         },

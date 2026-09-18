@@ -142,23 +142,103 @@ Keeps a Hytale `EntityEffect` on the player for as long as the talent is
 held.
 
 ```json
-{ "Type": "EntityEffect", "Id": "MyPack_Warrior_Mark" }
+{ "Type": "EntityEffect", "Id": "MyPack_Warrior_Regen" }
+{ "Type": "EntityEffect", "Id": ["MyPack_Regen_1", "MyPack_Regen_2", "MyPack_Regen_3"] }
 ```
 
 | Field | Required | Values | Default |
 |---|---|---|---|
-| `Id` | yes | An `EntityEffect` id: a file `Server/Entity/Effects/<Id>.json` in your pack (or a vanilla one). | — |
+| `Id` | yes | An `EntityEffect` id: a file `Server/Entity/Effects/<Id>.json` in your pack (or a vanilla one). One id, or one per rank: the last one repeats for higher ranks, and only the id of the current rank is held, so `MyPack_Regen_2` replaces `MyPack_Regen_1` rather than stacking on it. | — |
 
-Everything an entity effect can carry is available: stat modifiers, speed
-multipliers, damage resistance by cause, invulnerability, a model change,
-tints, particles, a HUD icon. The catalogue of useful fields and the
-vanilla files to copy from will be listed here when this type is applied
-in game.
+The effect is held as an **infinite** effect whatever the file says about
+`Duration`, and removed completely when the talent goes. Everything else
+comes from the file. What a talent typically wants from one:
 
-The effect also acts as a **flag**: an `EffectCondition` interaction can
-test whether the player has it, which is how an existing attack changes
-with a talent — override the weapon's root interaction in your pack with a
-branch conditioned on your effect.
+| Want | Write in the effect file | Vanilla file to copy |
+|---|---|---|
+| A **flag** for interactions | `{ "Infinite": true }` and nothing else. An `EffectCondition` interaction (`EntityEffectIds`, `Match: All`) branches on it: that is how an existing attack changes with a talent. See the example pack. | — |
+| Regeneration | `"StatModifiers": { "Health": 1 }, "DamageCalculatorCooldown": 2` — +1 every 2 s. `"ValueType": "Percent"` for a percentage of the maximum. Works for `Stamina`, `Mana`, `SignatureEnergy` too. | `Food/Buff/HealthRegen_Buff_T1` |
+| Less damage from a cause | `"DamageResistance": { "Fire": [ { "Amount": 0.25, "CalculationType": "Percent" } ] }`. Causes (`Server/Entity/Damage/`): `Physical`, `Slashing`, `Bludgeoning`, `Projectile`, `Elemental`, `Fire`, `Ice`, `Poison`, `Environmental`, `Environment`, `Fall`, `Drowning`, `Suffocation`, `OutOfWorld`, `Command`. `1.0` is immunity. | `Immunity/Immunity_Fire` |
+| Speed, knockback | `"ApplicationEffects": { "HorizontalSpeedMultiplier": 1.1, "KnockbackMultiplier": 0.5 }`. For jumping and falling, use `Movement`. | `Status/Slow` |
+| A visible signature | `"StatusEffectIcon": "UI/StatusEffects/HealthRegen.png"` for the HUD, `"ApplicationEffects": { "EntityTopTint": "#ff5a3c", "ModelVFXId": …, "Particles": […] }` on the body. | `Status/Burn` |
+
+### Changing an attack with a talent: the flag
+
+Nothing links the talent to the interaction. The effect file is empty;
+the interaction asks, at the moment it runs, whether the entity carries an
+effect of that **id**. Three files:
+
+1. The flag, `Server/Entity/Effects/MyPack_Flaming_Blade.json`:
+   ```json
+   { "Infinite": true }
+   ```
+2. The talent, which puts it on the player:
+   ```json
+   { "Type": "EntityEffect", "Id": "MyPack_Flaming_Blade" }
+   ```
+3. The interaction to change. Overriding a vanilla file means a file of the
+   same name in your pack; `"Parent": "super"` keeps everything the vanilla
+   one had, and you replace only what you want (`Next` is replaced whole,
+   so copy what the parent's `Next` did if you want to keep it):
+   ```json
+   {
+     "Parent": "super",
+     "Next": {
+       "Type": "Serial",
+       "Interactions": [
+         { "Type": "ApplyEffect", "EffectId": "Red_Flash", "Entity": "Target" },
+         {
+           "Type": "EffectCondition",
+           "EntityEffectIds": ["MyPack_Flaming_Blade"],
+           "Match": "All",
+           "Next": { "Type": "ApplyEffect", "EffectId": "Burn", "Entity": "Target" }
+         }
+       ]
+     }
+   }
+   ```
+   `EffectCondition` checks the entity running the interaction (the
+   attacker) unless `"Entity": "Target"` says otherwise; `Match: All`
+   passes when every listed effect is present, `None` when none is. With
+   the flag, `Next` runs; without it, nothing more happens.
+
+Who put the effect on the player does not matter to the interaction: a
+talent, a potion, `/effect`, another mod. That is why the flag file is
+empty — its only job is to exist under that id.
+
+Pick the file to override with care: a weapon's damage is usually set per
+item, in its `InteractionVars`, as a child (`"Parent"`) of a shared damage
+file. Override that shared file and every item inherits the branch;
+override the selector above it and only the items that define no vars are
+reached. The example pack does this for the sword's downward strike.
+
+Rules of thumb:
+
+- **No `StatusEffectIcon`, no capsule in the HUD.** Vanilla's own passives
+  (`Immunity_Poison`, `Immunity_Fire`) have none. Set one only for an
+  effect the player should see; `"Debuff": true` frames it as a malus.
+- **For a stat bonus, use `Stat`, not `RawStatModifiers`.** Hytale adds
+  the multiplicative modifiers of every active effect together, without
+  the product rule `Stat` applies between talents.
+- **One instance per effect id.** Two talents that name the same id give
+  one effect, not two, and losing either talent removes it for both until
+  the next sync. Two talents with regeneration files of their own, each
+  +1 every 2 s, do add up to +2: every active effect ticks on its own.
+  If a potion or food applies the same id as a talent, they share it too.
+  Give each talent an effect file of its own.
+- `ApplyConditions` in the file are honoured: while they refuse, the
+  effect is not placed, and the next sync tries again.
+
+### How it is applied
+
+Vanilla clears every entity effect when a player dies and again when they
+respawn; the talent effects are put back on respawn. They are saved with
+the player like any effect, so a reconnection changes nothing. The mod
+also keeps, on the player, the list of ids it placed: a talent removed
+from a graph while the player was away has its effect taken back at their
+next world entry, and an effect whose file disappeared is dropped by the
+server itself. Syncs happen at the same moments as for `Stat` — world
+entry, unlock, reset, graph load, reload or removal — plus respawn.
 
 ## Equipment
 
