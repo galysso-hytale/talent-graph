@@ -187,6 +187,16 @@ final class Camera {
         return (int) Math.round((canvasY - bounds.minY()) * zoom());
     }
 
+    /** {@return the window x of a canvas x, in screen units from the window's left edge} */
+    int screenX(double canvasX) {
+        return toScaledX(canvasX) - toScaledX(originX());
+    }
+
+    /** {@return the window y of a canvas y, in screen units from the window's top edge} */
+    int screenY(double canvasY) {
+        return toScaledY(canvasY) - toScaledY(originY());
+    }
+
     /** {@return a length in screen units} */
     int scale(int canvasLength) {
         return (int) Math.round(canvasLength * zoom());

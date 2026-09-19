@@ -1,6 +1,0 @@
-{
-  "Interactions": [ "Mage_Blade_Nova" ],
-  "RequireNewClick": true,
-  "Cooldown": { "Id": "Mage_Blade_Nova", "Cooldown": 12 },
-  "Tags": { "Attack": [ "Melee" ] }
-}

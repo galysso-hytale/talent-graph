@@ -1,0 +1,5 @@
+{
+  "Interactions": [ "Example_Blink" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Example_Blink", "Cooldown": 6 }
+}

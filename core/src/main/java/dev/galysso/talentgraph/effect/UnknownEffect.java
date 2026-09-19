@@ -27,6 +27,11 @@ public final class UnknownEffect extends TalentEffect {
     }
 
     @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        return null; // never survives validation
+    }
+
+    @Override
     protected boolean check(EffectValidation v) {
         v.warn((written == null || written.isBlank() ? "No \"Type\"" : "Unknown effect type \"" + written + "\"")
                 + "; supported: " + String.join(", ", EffectTypes.ids()) + " (see docs/EFFECTS.md)");

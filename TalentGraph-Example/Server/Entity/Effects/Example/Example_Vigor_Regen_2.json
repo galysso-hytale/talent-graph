@@ -1,0 +1,8 @@
+{
+  "$Comment": "Passive, rank 3 of vigor: +2 health every 2 seconds. Replaces Example_Vigor_Regen_1 (one id per rank, only the current one is held).",
+  "Infinite": true,
+  "StatModifiers": {
+    "Health": 2
+  },
+  "DamageCalculatorCooldown": 2
+}

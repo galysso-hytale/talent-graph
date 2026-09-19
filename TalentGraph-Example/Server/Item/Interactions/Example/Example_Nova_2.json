@@ -1,0 +1,39 @@
+{
+  "$Comment": "Nova, rank 2: a full signature bar for 25 fire damage to everything within 4 blocks. Modelled on Weapon_Mace_Signature_Groundslam.",
+  "Type": "StatsCondition",
+  "Costs": { "SignatureEnergy": 100 },
+  "ValueType": "Percent",
+  "Next": {
+    "Type": "Serial",
+    "Interactions": [
+      {
+        "Type": "Selector",
+        "RunTime": 0.3,
+        "Effects": {
+          "ItemAnimationId": "CastSummonCharged",
+          "WorldSoundEventId": "SFX_Fireball_Death",
+          "Particles": [
+            {
+              "SystemId": "Explosion_Medium",
+              "TargetEntityPart": "Entity",
+              "TargetNodeName": "Hip",
+              "PositionOffset": { "Y": 0.5 }
+            }
+          ]
+        },
+        "Selector": {
+          "Id": "AOECircle",
+          "Range": 4
+        },
+        "HitEntity": {
+          "Interactions": [ "Example_Nova_2_Damage" ]
+        }
+      },
+      {
+        "Type": "ChangeStat",
+        "StatModifiers": { "SignatureEnergy": -100 },
+        "ValueType": "Percent"
+      }
+    ]
+  }
+}

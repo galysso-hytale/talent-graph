@@ -16,6 +16,7 @@ import javax.annotation.Nullable;
  * { "Id": "cleave", "Name": "Cleave", "MaxRank": 1, "Cost": [2],
  *   "Requires": ["toughness"], "Icon": "Weapon_Sword_Copper",
  *   "X": 320, "Y": 180,
+ *   "Description": "A wide swing.",
  *   "Effects": [ { "Type": "Stat", "Stat": "Health", "Amount": 10 } ] }
  * }</pre>
  *
@@ -46,6 +47,13 @@ public final class TalentDefinition {
             .append(new KeyedCodec<>("Y", Codec.INTEGER, false), (d, v) -> d.y = v, d -> d.y).add()
             .append(new KeyedCodec<>("Effects", EffectTypes.LIST_CODEC, false),
                     (d, v) -> d.effects = v, d -> d.effects).add()
+            // One line under the title, in the tooltip and the detail panel:
+            // usually lore. Free text, or a key of the translation tables.
+            .append(new KeyedCodec<>("Description", Codec.STRING, false),
+                    (d, v) -> d.description = v, d -> d.description).add()
+            // A longer text shown in the detail panel only.
+            .append(new KeyedCodec<>("Details", Codec.STRING, false),
+                    (d, v) -> d.details = v, d -> d.details).add()
             .build();
 
     private String id;
@@ -60,6 +68,10 @@ public final class TalentDefinition {
     @Nullable
     private Integer y;
     private TalentEffect[] effects = new TalentEffect[0];
+    @Nullable
+    private String description;
+    @Nullable
+    private String details;
 
     public String getId() {
         return id;
@@ -99,6 +111,16 @@ public final class TalentDefinition {
     /** {@return the effects as decoded, not yet validated} */
     public TalentEffect[] getEffects() {
         return effects;
+    }
+
+    @Nullable
+    public String getDescription() {
+        return description;
+    }
+
+    @Nullable
+    public String getDetails() {
+        return details;
     }
 
     boolean hasPosition() {

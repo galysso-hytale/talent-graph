@@ -1,0 +1,7 @@
+{
+  "$Comment": "Storm: the second nova, on a shorter cooldown. A root interaction of its own so that the flame staff gets its own key binding (see storm in Example.json).",
+  "Interactions": [ "Example_Nova_2" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Example_Storm", "Cooldown": 8 },
+  "Tags": { "Attack": [ "Melee" ] }
+}

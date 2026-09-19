@@ -1,0 +1,8 @@
+{
+  "$Comment": "Passive, rank 2 of vigor: +1 health every 2 seconds. No StatusEffectIcon, so nothing shows in the HUD. No Name either: the tooltip takes its words from talentgraph.lang (effect.Example_Vigor_Regen_1).",
+  "Infinite": true,
+  "StatModifiers": {
+    "Health": 1
+  },
+  "DamageCalculatorCooldown": 2
+}

@@ -2,13 +2,14 @@ $C = "../../Common.ui";
 $Sounds = "../../Sounds.ui";
 
 // One frame per state, toggled through Visible by the server. Frames are
-// inert: no hover style, no sound, no event. They still carry the tooltip,
-// which is where the player reads why a talent cannot be unlocked. Backgrounds
-// are 9-slices so the node can be resized without redrawing the textures.
+// inert to the left click: no hover style, no sound. They carry the events
+// the page needs: the cursor entering and leaving (the hover card, where
+// the player reads what the talent gives and why it cannot be unlocked)
+// and the right click (the detail panel). No client tooltip: the card is
+// the tooltip. Backgrounds are 9-slices so the node can be resized without
+// redrawing the textures.
 @StateFrame = Button {
   Visible: false;
-  TextTooltipShowDelay: 0.1;
-  TextTooltipStyle: $C.@DefaultTextTooltipStyle;
 };
 
 @BadgeStyle = LabelStyle(
@@ -38,17 +39,19 @@ Group {
   }
 
   // A ghost: a prerequisite that names no talent, drawn where the author
-  // will look for it (see LiveReload). Dashed frame, no state.
+  // will look for it (see LiveReload). Dashed frame, no state; a plain
+  // client tooltip, since a ghost has nothing but its message.
   @StateFrame #Ghost {
     Style: (Default: (Background: (TexturePath: "Node/Ghost.png", Border: 8)));
-  }
-
-  // The only interactive element, shown solely when the talent can be
-  // unlocked right now. Transparent at rest so the state frame shows through.
-  Button #Action {
-    Visible: false;
     TextTooltipShowDelay: 0.1;
     TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+  }
+
+  // The only element the left click reaches, shown solely when the talent
+  // can be unlocked right now. Transparent at rest so the state frame shows
+  // through.
+  Button #Action {
+    Visible: false;
     Style: (
       Sounds: $Sounds.@ButtonsLight,
       Hovered: (Background: (TexturePath: "Node/Action_Hovered.png", Border: 8))

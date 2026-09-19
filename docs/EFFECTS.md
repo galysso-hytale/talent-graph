@@ -5,8 +5,10 @@ typed **effects**. This file is the reference: a value that is not listed
 here is not supported, and the loader says so on the tree.
 
 > **Status.** The format and its validation are in place. `Stat`,
-> `EntityEffect`, `Equipment` and `Ability` are applied in game;
-> `Movement` is accepted, shown in the report, and does nothing yet.
+> `EntityEffect`, `Equipment` and `Ability` are applied in game and
+> described in the tooltips; `Movement` is accepted, described, and does
+> nothing yet. The worked example of everything below is the
+> `TalentGraph-Example` pack next to this mod.
 
 The mod does not invent game mechanics. Each effect type is a bridge to
 something the server already does — entity stats, entity effects, root
@@ -26,6 +28,7 @@ JSON in your pack; the talent only attaches it to the player.
     "Talents": [
         {
             "Id": "toughness", "Name": "Toughness", "MaxRank": 3, "Cost": [1, 2, 3],
+            "Description": "Old scars, thick skin.",
             "Effects": [
                 { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] },
                 { "Type": "Stat", "Stat": "Stamina", "Amount": 0.9, "Calculation": "Multiplicative" }
@@ -39,6 +42,8 @@ JSON in your pack; the talent only attaches it to the player.
   that type. A talent may have any number of effects, of any types.
 - `Equipment` on the graph: the starting point for equipment restrictions,
   see [Equipment](#equipment).
+- `Description` and `Details` on a talent: your own words beside the
+  generated lines, see [Tooltips](#tooltips).
 
 ## Conventions shared by every type
 
@@ -46,6 +51,7 @@ JSON in your pack; the talent only attaches it to the player.
 |---|---|
 | `Type` | One of `Stat`, `EntityEffect`, `Equipment`, `Ability`, `Movement`. Case matters. |
 | `FromRank` | Optional, default 1. The rank from which the effect applies; below it nothing is granted. Lets a talent give +10 health at rank 1 and, from rank 2, an ability as well. |
+| `Description` | Optional. Your words for this effect's line in the tooltip, in place of the generated label; see [Tooltips](#tooltips). |
 
 **Values per rank.** Every numeric `Amount` accepts one number or an array
 with one value per rank; the last value repeats for higher ranks, exactly
@@ -69,6 +75,75 @@ A *type* error — a string where a number is expected — is not an effect
 fault but a file fault: the asset store rejects the file, the previous
 version stays, and the tracker sees where it breaks.
 
+## Tooltips
+
+Nothing to write: hovering a node shows a card that lists what its effects
+give, one line per effect, generated from the file in the player's
+language and grouped under a heading per type — `STATS`, `MOVEMENT`,
+`EFFECTS`, `EQUIPMENT`, `ABILITIES`. The card is drawn by the page, not
+by the client's tooltip, so it holds separators, the mouse glyphs and key
+caps of the game beside the abilities, and colours:
+
+```
+        Toughness
+        Rank 1/3
+  Old scars, thick skin.
+──────────── ◆ ────────────
+STATS
++10 -> +20 Max health
+×0.9 Max stamina
+─────────────────────────
+EFFECTS
+Slow regeneration (from rank 2)
+──────────── ◆ ────────────
+Click to upgrade (2 point(s))
+```
+
+- The rank described is the **next** one while the talent can still grow
+  (what the click gives, with an arrow from the current value when it
+  changes), the current one once maxed.
+- **Green** is a gain, **red** a loss: a negative or below-1 amount, an
+  entity effect with `"Debuff": true`, a `Forbid`. Which way is a gain is
+  known per stat (the *Shown as* column below; a stat your pack defines
+  counts up as a gain). **Grey** with `(from rank N)` is an effect the
+  described rank does not give yet.
+- Within a heading: gains, then losses, then grey; stats and settings in
+  the order of the tables below (the same in every language), your own
+  stats after them alphabetically; item lists, entity effects and
+  abilities alphabetically in the player's language.
+- An ability reads `Nova - with a staff in hand, 12 s cooldown` beside
+  the glyph of its key (the mouse buttons, or the default key of the slot
+  in a key cap), then what the effect states (the `HeldItem`, the root
+  interaction's `Cooldown`). Costs and other conditions live inside the
+  chain and are not read: write them.
+
+**Right-click** a node for the detail panel: the same lines with the value
+of every rank (`+10 / +20 / +35`, the current one in bold), `FromRank` on
+every line it concerns, and the longer texts below.
+
+Three fields take your words, free text or a key of the translation
+tables (see below):
+
+| Field | On | Shown |
+|---|---|---|
+| `Description` | the talent | One line under the title, in the tooltip and the panel. Lore, mostly. |
+| `Details` | the talent | A paragraph at the bottom of the panel only. |
+| `Description` | an effect | Replaces the generated **label** of that line — the spell's name, the entity effect's name, the item list — and keeps its structure: colour, key, item in hand, cooldown, `(from rank N)`. Where a spell's cost goes. |
+
+Without a `Description`, a spell or an entity effect is named after its
+file (`MyPack_Blink` → "MyPack Blink"), or after the entity effect's
+`"Name"` when it has one. The third way is the one that translates: a
+file `Server/Languages/<lang>/talentgraph.lang` in your pack, one line
+per id — `ability.MyPack_Blink = Blink (4 stamina)`, `effect.<Id> = …`,
+`stat.<Id> = …` for a stat of your own, `tag.<Key>.<Value> = …` and
+`tagOne.<Key>.<Value> = …` (plural and singular) for a tag of your own.
+The server prefixes each key with the file name (`talentgraph.`), so the
+file must bear that name; the words are looked up in the player's
+language, then `en-US`. The mod's own `talentgraph.lang` holds every
+vanilla stat, setting and tag, and the tooltip words; copy it into another
+language folder to translate them. A `"Name"`, `"Description"` or
+`"Details"` that is itself a key of the tables is shown translated.
+
 ## Stat
 
 Moves the maximum (or minimum) of an entity stat.
@@ -84,7 +159,7 @@ Moves the maximum (or minimum) of an entity stat.
 | `Stat` | yes | An `EntityStatType` id: one of the vanilla stats below, or one your pack defines in `Server/Entity/Stats/<Id>.json`. | — |
 | `Amount` | yes | Number or per-rank array. Negative (additive) or below 1 (multiplicative) is a malus, for specialisations. | — |
 | `Calculation` | no | `Additive`: the amount is added. `Multiplicative`: the bound is multiplied. | `Additive` |
-| `Target` | no | `Max` or `Min`: which bound moves. | `Max` |
+| `Target` | no | `Max` or `Min`: which bound moves. `Min` is meant for a stat of your own that uses its floor; no vanilla stat gains anything from it (see the notes below). | `Max` |
 
 ### How it is applied
 
@@ -118,23 +193,29 @@ does: `(base + all additives) × sum of all multiplicatives`.
 Values from `Server/Entity/Stats/` of the 0.6.5 assets. *Initial*, *Min*
 and *Max* are the player's, before any item or effect.
 
-| Id | Role in game | Initial / Min / Max | Notes |
-|---|---|---|---|
-| `Health` | Hit points. | 100 / 0 / 100 | The obvious one. `Max` +20 is a fifth more health. Regeneration is defined in the stat itself and is not modified here; for a regeneration talent, use an `EntityEffect` modelled on `Potion_Health_Regen`. |
-| `Stamina` | Sprinting, dodging, attacks. | 10 / −4 / 10 | Goes negative when overspent, hence the minimum. `Max` ×1.2 makes long fights easier. |
-| `Mana` | Magic weapons' resource. | 0 / 0 / 0 | The maximum is **0** until a magic item opens it: a `Max` bonus alone gives nothing to a warrior, but adds to a wand's pool. |
-| `Oxygen` | Breath under water. | 100 / 0 / 100 | Refills fast out of water. |
-| `SignatureEnergy` | Charge of the weapon's signature ability (`Ability1`). | 0 / 0 / 0 | Maximum opened by the wielded weapon (sword 20, mace 8, flame staff 10, plain staffs none), filled by its hits. |
-| `SignatureCharges` | Stored signature charges. | 0 / 0 / 100 | Internal to the signature system; hidden from tooltips. |
-| `MagicCharges` | Charges of magic weapons, regenerating one every 2 s. | 0 / 0 / 0 | Maximum opened by the item; hidden from tooltips. |
-| `Immunity` | Builds up while immune; at 100 applies the `Immune` effect. | 0 / 0 / 100 | Decays by itself. Of little use to a talent. |
-| `StaminaRegenDelay` | Countdown before stamina regenerates. | 0 / −60 / 0 | Negative while waiting. Changing `Min` changes how long the wait can get. |
-| `Ammo` | Technical: ammunition display. | 0 / 0 / 0 | Not worth modifying. |
-| `GlidingActive` | Technical: whether the glider is open. | 0 / 0 / 1 | Not worth modifying. |
-| `DeployablePreview` | Technical: deployable placement preview. | 0 / 0 / 1 | Not worth modifying. |
+The *Shown as* column is the tooltip's word for the stat (`Max` or `Min`
+precedes it: "Max health"); the order of the table is the order of the
+lines. Raising a bound counts as a gain for every stat, `Min` included.
+
+| Id | Shown as | Role in game | Initial / Min / Max | Notes |
+|---|---|---|---|---|
+| `Health` | health | Hit points. | 100 / 0 / 100 | The obvious one. `Max` +20 is a fifth more health. Regeneration is defined in the stat itself and is not modified here; for a regeneration talent, use an `EntityEffect` modelled on `Potion_Health_Regen`. |
+| `Stamina` | stamina | Sprinting, dodging, attacks. | 10 / −4 / 10 | Goes negative when overspent, down to `Min`. `Max` ×1.2 makes long fights easier; moving `Min` only changes how deep the overspend can go, of no use to a talent. |
+| `Mana` | mana | Magic weapons' resource. | 0 / 0 / 0 | The maximum is **0** until a magic item opens it: a `Max` bonus alone gives nothing to a warrior, but adds to a wand's pool. |
+| `Oxygen` | oxygen | Breath under water. | 100 / 0 / 100 | Refills fast out of water. |
+| `SignatureEnergy` | signature energy | Charge of the weapon's signature ability (`Ability1`). | 0 / 0 / 0 | Maximum opened by the wielded weapon (sword 20, mace 8, flame staff 10, plain staffs none), filled by its hits. |
+| `MagicCharges` | magic charges | Charges of magic weapons, regenerating one every 2 s. | 0 / 0 / 0 | Maximum opened by the item; hidden from the HUD. |
+| `Immunity` | immunity | Builds up while immune; at 100 applies the `Immune` effect. | 0 / 0 / 100 | Decays by itself. Of little use to a talent. |
+| `StaminaRegenDelay` | stamina regeneration delay | Countdown before stamina regenerates. | 0 / −60 / 0 | Set to about −1 by an action, counts up to 0. `Min` is a cap no action reaches; nothing here is worth a talent. |
+| `SignatureCharges` | signature charges | Stored signature charges. | 0 / 0 / 100 | Internal to the signature system; hidden from the HUD. |
+| `Ammo` | ammunition | Technical: ammunition display. | 0 / 0 / 0 | Not worth modifying. |
+| `GlidingActive` | glider state | Technical: whether the glider is open. | 0 / 0 / 1 | Not worth modifying. |
+| `DeployablePreview` | deployable preview | Technical: deployable placement preview. | 0 / 0 / 1 | Not worth modifying. |
 
 A stat your pack adds is accepted as soon as its file exists; it only has
-an effect in game if some interaction reads it.
+an effect in game if some interaction reads it. The tooltip shows its id
+as words (`Rage_Meter` → "Max Rage Meter") unless your pack's
+`talentgraph.lang` has a `stat.Rage_Meter` line; a bonus counts as a gain.
 
 ## EntityEffect
 
@@ -417,10 +498,10 @@ The ability itself is written with Hytale's interaction toolkit
 (`ChangeStat` for a heal, `Selector` + `DamageEntity` for a nova,
 `ApplyEffect`, `LaunchProjectile`, `ApplyForce`…); nothing about what it
 does is described in the graph, and this mod invents no spell language.
-The dev pack's `Mage.json` binds all six keys with vanilla bricks only:
-`Server/Item/RootInteractions/TalentGraph/Mage/` and
-`Server/Item/Interactions/TalentGraph/Mage/` are a worked example of every
-recipe below.
+The example pack's `Example.json` binds all six keys with vanilla bricks
+only: `Server/Item/RootInteractions/Example/` and
+`Server/Item/Interactions/Example/` of `TalentGraph-Example` are a worked
+example of every recipe below.
 
 ### Keys
 
@@ -491,7 +572,7 @@ recipe (`Wand_Cast_Left_Charged`):
   that replaces a weapon's attack cuts that supply: give the talent its
   own reserve (`{ "Type": "Stat", "Stat": "SignatureEnergy", "Amount":
   10 }`) and charge it from the ability (`ChangeStat` with a positive
-  amount), as the dev pack's `nova` and bolts do. Stats worth using:
+  amount), as the example pack's `nova` and bolts do. Stats worth using:
   `Mana`, `Stamina`,
   `SignatureEnergy` (with `"ValueType": "Percent"` and `Costs 100` for a
   signature-like ability), `MagicCharges`, `SignatureCharges`.
@@ -500,9 +581,10 @@ recipe (`Wand_Cast_Left_Charged`):
   "Mana", "Amount": 50 }` is the "awakening" talent every mage graph
   starts with.
 - `Cooldown` on the root interaction (`{ "Id": "...", "Cooldown": 8 }`)
-  keeps the chain from starting again for that long; `RequireNewClick`
-  stops a held button from repeating. `CooldownCondition` +
-  `TriggerCooldown` put a cooldown on one branch only.
+  keeps the chain from starting again for that long, and is what the
+  tooltip shows; `RequireNewClick` stops a held button from repeating.
+  `CooldownCondition` + `TriggerCooldown` put a cooldown on one branch
+  only (unseen by the tooltip: say it in the effect's `Description`).
 - `ModifyInventory` with `ItemToRemove` consumes an item (ammunition,
   reagent); `AdjustHeldItemDurability` wears the held item.
 - `TalentGraph_NoMana` and `TalentGraph_NoStamina`
@@ -530,7 +612,8 @@ So a power-up is written as **ranks** (`"Interaction": ["Bolt_1",
 itself. A specific item beats a family: `battle_mage` on `Ability1` with
 `Family=Sword` next to `nova` on `Ability1` with `Family=Staff` never
 collide, and an ability on `Weapon_Staff_Cobalt` beats one on
-`Family=Staff` when that staff is held.
+`Family=Staff` when that staff is held (the example pack's `storm`,
+with a `Priority` to make it explicit).
 
 What is **not** resolved is two distinct spells a player can hold at once
 on the same key, with `HeldItem`s that name a common item (or none) and the
@@ -578,23 +661,25 @@ Speed settings shift the balance of combat and exploration for everyone
 the player meets; prefer small values (×1.05, ×1.1) and jump height over
 run speed.
 
-Vanilla values are those of a player on server 0.6.5.
+Vanilla values are those of a player on server 0.6.5. *Shown as* is the
+tooltip's word; the order of the table is the order of the lines, and
+raising a setting is a gain for all but `RollTimeToComplete`.
 
-| Setting | Meaning | Vanilla |
-|---|---|---|
-| `JumpForce` | Upward impulse of a jump: jump height. | 11.8 |
-| `SwimJumpForce` | Same, out of water. | 10.0 |
-| `BaseSpeed` | Ground speed everything else multiplies. Affects the balance the most. | 5.5 |
-| `Acceleration` | How fast the player reaches speed. | 0.1 |
-| `ForwardSprintSpeedMultiplier` | Sprint speed, as a multiple of running. | 1.65 |
-| `ForwardRunSpeedMultiplier`, `BackwardRunSpeedMultiplier`, `StrafeRunSpeedMultiplier` | Running speed by direction. | 1.0, 0.65, 0.8 |
-| `ForwardWalkSpeedMultiplier`, `BackwardWalkSpeedMultiplier`, `StrafeWalkSpeedMultiplier` | Walking (slow mode) speed by direction. | 0.3, 0.3, 0.3 |
-| `ForwardCrouchSpeedMultiplier`, `BackwardCrouchSpeedMultiplier`, `StrafeCrouchSpeedMultiplier` | Crouching speed by direction. | 0.55, 0.4, 0.45 |
-| `AirSpeedMultiplier` | Horizontal speed while airborne. | 1.0 |
-| `AirControlMaxMultiplier` | How much the player can steer in the air. | 3.13 |
-| `ClimbSpeed`, `ClimbSpeedLateral` | Climbing speed, up and sideways. | 0.035, 0.035 |
-| `ClimbUpSprintSpeed`, `ClimbDownSprintSpeed` | Climbing speed while sprinting. | 0.045, 0.055 |
-| `RollTimeToComplete` | Duration of the landing roll, in seconds; lower is faster. | 0.9 |
+| Setting | Shown as | Meaning | Vanilla |
+|---|---|---|---|
+| `JumpForce` | Jump height | Upward impulse of a jump: jump height. | 11.8 |
+| `SwimJumpForce` | Jump height out of water | Same, out of water. | 10.0 |
+| `BaseSpeed` | Movement speed | Ground speed everything else multiplies. Affects the balance the most. | 5.5 |
+| `Acceleration` | Acceleration | How fast the player reaches speed. | 0.1 |
+| `ForwardSprintSpeedMultiplier` | Sprint speed | Sprint speed, as a multiple of running. | 1.65 |
+| `ForwardRunSpeedMultiplier`, `BackwardRunSpeedMultiplier`, `StrafeRunSpeedMultiplier` | Running speed, Backward running speed, Sideways running speed | Running speed by direction. | 1.0, 0.65, 0.8 |
+| `ForwardWalkSpeedMultiplier`, `BackwardWalkSpeedMultiplier`, `StrafeWalkSpeedMultiplier` | Walking speed, Backward walking speed, Sideways walking speed | Walking (slow mode) speed by direction. | 0.3, 0.3, 0.3 |
+| `ForwardCrouchSpeedMultiplier`, `BackwardCrouchSpeedMultiplier`, `StrafeCrouchSpeedMultiplier` | Crouching speed, Backward crouching speed, Sideways crouching speed | Crouching speed by direction. | 0.55, 0.4, 0.45 |
+| `AirSpeedMultiplier` | Air speed | Horizontal speed while airborne. | 1.0 |
+| `AirControlMaxMultiplier` | Air control | How much the player can steer in the air. | 3.13 |
+| `ClimbSpeed`, `ClimbSpeedLateral` | Climbing speed, Sideways climbing speed | Climbing speed, up and sideways. | 0.035, 0.035 |
+| `ClimbUpSprintSpeed`, `ClimbDownSprintSpeed` | Climbing sprint speed, upwards / downwards | Climbing speed while sprinting. | 0.045, 0.055 |
+| `RollTimeToComplete` | Landing roll duration | Duration of the landing roll, in seconds; lower is faster. | 0.9 |
 
 Not supported, on purpose: fall damage mitigation (a server-side config,
 not a per-player setting) and extra jumps (carried by the boots' item

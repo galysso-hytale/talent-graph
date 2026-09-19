@@ -1,4 +1,4 @@
 {
-  "$Comment": "A flag: does nothing by itself. Example_Sword_Swing_Down_Damage tests for it.",
+  "$Comment": "A flag: does nothing by itself. Weapon_Sword_Primary_Swing_Down_Damage tests for it. The tooltip line comes from the Description written on the talent effect.",
   "Infinite": true
 }

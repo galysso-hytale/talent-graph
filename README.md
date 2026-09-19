@@ -52,6 +52,12 @@ JAVA_HOME=~/.local/share/JetBrains/Toolbox/apps/intellij-idea/jbr \
 ./gradlew updateAllPluginManifests   # regenerate core/src/main/resources/manifest.json
 ```
 
+The mod ships no graph of its own. The dev server loads the example pack
+through a symlink, `core/run/mods/Galysso_talentgraph-example ->
+../../../TalentGraph-Example` (create it once; `core/run` is ignored by git),
+so `/talents` shows `Example.json` and edits to the pack are live with
+`/talents track start`.
+
 ### Hytale assets
 
 `setupHytaleDev` needs the game's `Assets.zip`. By default it runs an OAuth

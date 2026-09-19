@@ -1,0 +1,31 @@
+{
+  "$Comment": "Blade nova: the sword's own vanilla signature, then a small nova. Shows an ability wrapping the signature instead of replacing it.",
+  "Type": "Serial",
+  "Interactions": [
+    {
+      "Type": "RunRootInteraction",
+      "RootInteraction": "Root_Weapon_Sword_Signature_Vortexstrike"
+    },
+    {
+      "Type": "Selector",
+      "RunTime": 0.2,
+      "Effects": {
+        "Particles": [
+          {
+            "SystemId": "Explosion_Small",
+            "TargetEntityPart": "Entity",
+            "TargetNodeName": "Hip",
+            "PositionOffset": { "Y": 0.5 }
+          }
+        ]
+      },
+      "Selector": {
+        "Id": "AOECircle",
+        "Range": 2
+      },
+      "HitEntity": {
+        "Interactions": [ "Example_Blade_Nova_Damage" ]
+      }
+    }
+  ]
+}

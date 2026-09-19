@@ -1,0 +1,5 @@
+{
+  "$Comment": "No Cooldown here: the 30 s one sits inside Example_Focus so that creative mode keeps picking blocks freely, and a root cooldown would be what the tooltip shows.",
+  "Interactions": [ "Example_Focus" ],
+  "RequireNewClick": true
+}

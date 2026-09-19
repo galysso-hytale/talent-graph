@@ -4,6 +4,8 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 
+import javax.annotation.Nullable;
+
 /**
  * One entry of a talent's {@code "Effects"} list, as written in the graph
  * file. Each subclass is one {@code "Type"} (see {@link EffectTypes}) and
@@ -21,9 +23,16 @@ public abstract class TalentEffect {
             // Rank from which the effect applies; below it, nothing is granted.
             .append(new KeyedCodec<>("FromRank", Codec.INTEGER, false),
                     (e, v) -> e.fromRank = v, e -> e.fromRank).add()
+            // Words for the tooltip, in place of the generated label of this
+            // effect: a spell's cost, what an entity effect does. Free text,
+            // or a key of the translation tables.
+            .append(new KeyedCodec<>("Description", Codec.STRING, false),
+                    (e, v) -> e.description = v, e -> e.description).add()
             .build();
 
     protected int fromRank = 1;
+    @Nullable
+    protected String description;
 
     /** {@return the {@code "Type"} this effect was registered under} */
     public abstract String type();
@@ -48,6 +57,25 @@ public abstract class TalentEffect {
 
     /** Type-specific part of {@link #validate}. */
     protected abstract boolean check(EffectValidation v);
+
+    /**
+     * Puts the effect into words at a rank where it applies, for the
+     * tooltip and the detail panel. The line names what the player gets
+     * at that rank in the language of {@code d}; the describer adds what
+     * depends on the player's own rank (inactive lines, "+10 → +20").
+     * A {@code "Description"} on the effect replaces the label the line
+     * would generate, never its structure (colour, key, conditions).
+     *
+     * @return the line, or null for an effect with nothing to show
+     */
+    @Nullable
+    protected abstract Line describe(EffectDescriber d, int rank);
+
+    /** {@return the {@code "Description"} as written, or null} */
+    @Nullable
+    public String description() {
+        return description;
+    }
 
     /** {@return the first rank at which the effect applies, at least 1} */
     public int fromRank() {

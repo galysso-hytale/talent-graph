@@ -1,0 +1,162 @@
+# Words of the talent tooltips and detail panel. The server prefixes every
+# key with the file name: "stat.Health" is looked up as "talentgraph.stat.Health".
+# A pack may ship this file in another language under Server/Languages/<lang>/,
+# and translate its own ids under stat.<Id>, effect.<Id>, ability.<Id>,
+# tag.<Key>.<Value> (a tag "Family=Sword" is the key "tag.Family.Sword").
+
+# === stats: the bound wraps the stat ===
+target.Max = Max {stat}
+target.Min = Min {stat}
+stat.Health = health
+stat.Stamina = stamina
+stat.Mana = mana
+stat.Oxygen = oxygen
+stat.SignatureEnergy = signature energy
+stat.MagicCharges = magic charges
+stat.Immunity = immunity
+stat.StaminaRegenDelay = stamina regeneration delay
+stat.SignatureCharges = signature charges
+stat.Ammo = ammunition
+stat.GlidingActive = glider state
+stat.DeployablePreview = deployable preview
+
+# === movement settings ===
+setting.JumpForce = Jump height
+setting.SwimJumpForce = Jump height out of water
+setting.BaseSpeed = Movement speed
+setting.Acceleration = Acceleration
+setting.ForwardSprintSpeedMultiplier = Sprint speed
+setting.ForwardRunSpeedMultiplier = Running speed
+setting.BackwardRunSpeedMultiplier = Backward running speed
+setting.StrafeRunSpeedMultiplier = Sideways running speed
+setting.ForwardWalkSpeedMultiplier = Walking speed
+setting.BackwardWalkSpeedMultiplier = Backward walking speed
+setting.StrafeWalkSpeedMultiplier = Sideways walking speed
+setting.ForwardCrouchSpeedMultiplier = Crouching speed
+setting.BackwardCrouchSpeedMultiplier = Backward crouching speed
+setting.StrafeCrouchSpeedMultiplier = Sideways crouching speed
+setting.AirSpeedMultiplier = Air speed
+setting.AirControlMaxMultiplier = Air control
+setting.ClimbSpeed = Climbing speed
+setting.ClimbSpeedLateral = Sideways climbing speed
+setting.ClimbUpSprintSpeed = Climbing sprint speed, upwards
+setting.ClimbDownSprintSpeed = Climbing sprint speed, downwards
+setting.RollTimeToComplete = Landing roll duration
+
+# === item tags: plural for equipment lists, singular for "with … in hand" ===
+tag.Type.Weapon = weapons
+tagOne.Type.Weapon = a weapon
+tag.Type.Armor = armor
+tagOne.Type.Armor = armor
+tag.Type.Tool = tools
+tagOne.Type.Tool = a tool
+tag.Family.Sword = swords
+tagOne.Family.Sword = a sword
+tag.Family.Longsword = longswords
+tagOne.Family.Longsword = a longsword
+tag.Family.Dagger = daggers
+tagOne.Family.Dagger = a dagger
+tag.Family.Axe = axes
+tagOne.Family.Axe = an axe
+tag.Family.Mace = maces
+tagOne.Family.Mace = a mace
+tag.Family.Club = clubs
+tagOne.Family.Club = a club
+tag.Family.Spear = spears
+tagOne.Family.Spear = a spear
+tag.Family.Staff = staffs
+tagOne.Family.Staff = a staff
+tag.Family.Wand = wands
+tagOne.Family.Wand = a wand
+tag.Family.Spellbook = spellbooks
+tagOne.Family.Spellbook = a spellbook
+tag.Family.Shield = shields
+tagOne.Family.Shield = a shield
+tag.Family.Bow = bows
+tagOne.Family.Bow = a bow
+tag.Family.Crossbow = crossbows
+tagOne.Family.Crossbow = a crossbow
+tag.Family.Gun = guns
+tagOne.Family.Gun = a gun
+tag.Family.Bomb = bombs
+tagOne.Family.Bomb = a bomb
+tag.Family.Arrow = arrows
+tagOne.Family.Arrow = an arrow
+tag.Family.Stick = sticks
+tagOne.Family.Stick = a stick
+tag.Family.Magic = magic weapons
+tagOne.Family.Magic = a magic weapon
+tag.Family.Copper = copper armor
+tagOne.Family.Copper = copper armor
+tag.Family.Iron = iron armor
+tagOne.Family.Iron = iron armor
+tag.Family.Steel = steel armor
+tagOne.Family.Steel = steel armor
+tag.Family.Bronze = bronze armor
+tagOne.Family.Bronze = bronze armor
+tag.Family.Cobalt = cobalt armor
+tagOne.Family.Cobalt = cobalt armor
+tag.Family.Mithril = mithril armor
+tagOne.Family.Mithril = mithril armor
+tag.Family.Adamantite = adamantite armor
+tagOne.Family.Adamantite = adamantite armor
+tag.Family.Thorium = thorium armor
+tagOne.Family.Thorium = thorium armor
+tag.Family.Onyxium = onyxium armor
+tagOne.Family.Onyxium = onyxium armor
+tag.Family.Prisma = prisma armor
+tagOne.Family.Prisma = prisma armor
+tag.Family.Leather = leather armor
+tagOne.Family.Leather = leather armor
+tag.Family.Cloth_Cotton = cotton clothes
+tagOne.Family.Cloth_Cotton = cotton clothes
+tag.Family.Cloth_Linen = linen clothes
+tagOne.Family.Cloth_Linen = linen clothes
+tag.Family.Cloth_Wool = wool clothes
+tagOne.Family.Cloth_Wool = wool clothes
+tag.Family.Cloth_Silk = silk clothes
+tagOne.Family.Cloth_Silk = silk clothes
+tag.Family.Diving = diving gear
+tagOne.Family.Diving = diving gear
+tag.Family.Kweebec = Kweebec armor
+tagOne.Family.Kweebec = Kweebec armor
+tag.Family.Trork = Trork armor
+tagOne.Family.Trork = Trork armor
+tag.Family.Trooper = Trooper armor
+tagOne.Family.Trooper = Trooper armor
+
+# === ability slots: default keys, shown in the tooltip; the panel shows the configured key ===
+key.Primary = Left click
+key.Secondary = Right click
+key.Ability1 = Q
+key.Ability2 = E
+key.Ability3 = R
+key.Pick = Middle click
+ability.key = [{key}]
+ability.heldItem = with {items} in hand
+ability.cooldown = {time} cooldown
+# Plain ASCII: the game's font lacks the em dash, the middle dot and the arrow.
+ability.conditions = - {conditions}
+ability.conditionSeparator = ", "
+unit.seconds = {n} s
+
+# === equipment ===
+equipment.allow = Can use: {items}
+equipment.forbid = Cannot use: {items}
+
+# === lists ===
+list.separator = ", "
+list.and = " and "
+list.or = " or "
+
+# === tooltip and panel ===
+category.Stats = Stats
+category.Movement = Movement
+category.Effects = Effects
+category.Equipment = Equipment
+category.Abilities = Abilities
+tooltip.conditional = (conditional)
+tooltip.upgrade = {from} -> {to}
+tooltip.fromRank = (from rank {rank})
+panel.rankSeparator = " / "
+panel.hint = Right-click a talent for details

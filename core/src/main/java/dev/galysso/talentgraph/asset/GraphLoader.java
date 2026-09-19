@@ -223,9 +223,14 @@ public final class GraphLoader {
             baseline.validate(refs, this::warning);
         }
         Map<TalentId, List<TalentEffect>> byTalent = new LinkedHashMap<>();
+        Map<TalentId, GraphEffects.Blurb> blurbs = new HashMap<>();
         for (Map.Entry<TalentId, Entry> e : entries.entrySet()) {
             TalentId id = e.getKey();
             Entry entry = e.getValue();
+            GraphEffects.Blurb blurb = new GraphEffects.Blurb(blank(entry.def.getDescription()), blank(entry.def.getDetails()));
+            if (!blurb.isEmpty()) {
+                blurbs.put(id, blurb);
+            }
             TalentEffect[] effects = entry.def.getEffects();
             List<TalentEffect> kept = new ArrayList<>();
             for (int i = 0; i < effects.length; i++) {
@@ -248,7 +253,13 @@ public final class GraphLoader {
         Map<TalentId, Set<TalentId>> ancestors = ancestors();
         warnAbilities(byTalent, ancestors);
         warnIdleAllows(baseline, byTalent);
-        return new GraphEffects(baseline, byTalent, ancestors);
+        return new GraphEffects(baseline, byTalent, ancestors, blurbs);
+    }
+
+    /** {@return the text, or null when absent or blank} */
+    @Nullable
+    private static String blank(@Nullable String text) {
+        return text == null || text.isBlank() ? null : text;
     }
 
     /** The prerequisites of each talent, direct and transitive; the cycles are cut by now. */

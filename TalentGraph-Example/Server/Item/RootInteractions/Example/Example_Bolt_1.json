@@ -1,0 +1,6 @@
+{
+  "Interactions": [ "Example_Bolt_1" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Example_Bolt_1", "Cooldown": 0.6 },
+  "Tags": { "Attack": [ "Ranged" ] }
+}

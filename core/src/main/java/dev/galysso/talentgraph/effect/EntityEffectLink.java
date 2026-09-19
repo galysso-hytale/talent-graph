@@ -48,6 +48,24 @@ public final class EntityEffectLink extends TalentEffect {
         return Ids.check(v, "Id", "entity effect", "Server/Entity/Effects/", ids, v.refs()::hasEntityEffect);
     }
 
+    /**
+     * The name of the rank's effect: the {@code "Description"}, else a
+     * translation a pack supplies under {@code talentgraph.effect.<Id>},
+     * else the asset's {@code "Name"}, else its id as words. Red when the
+     * asset says {@code "Debuff": true}; "(conditional)" when it only
+     * applies under conditions the asset states.
+     */
+    @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        String id = idAt(rank);
+        String assetName = d.texts().keyOrRaw(d.refs().entityEffectName(id));
+        String name = d.label(description, "effect." + id,
+                assetName != null ? assetName : EffectDescriber.humanise(id));
+        Line.Sign sign = d.refs().isDebuff(id) ? Line.Sign.LOSS : Line.Sign.GAIN;
+        String suffix = d.refs().hasApplyConditions(id) ? d.get("tooltip.conditional") : "";
+        return new Line(Line.Category.EFFECTS, sign, "", name, suffix, Line.NO_ORDER, null, fromRank, true);
+    }
+
     /** {@return the {@code EntityEffect} asset id held at a rank, the last one repeating; rank counts from 1} */
     public String idAt(int rank) {
         return Ids.at(ids, rank);

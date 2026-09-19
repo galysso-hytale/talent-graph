@@ -56,6 +56,21 @@ public final class MovementEffect extends TalentEffect {
         return true;
     }
 
+    /**
+     * {@code "×1.1 Jump height"}: like a stat, with the settings in their
+     * documented order. Every setting is a gain when it goes up but the
+     * roll duration.
+     */
+    @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        String label = d.label(description, "setting." + setting.id(), EffectDescriber.humanise(setting.id()));
+        double value = amount.at(rank);
+        boolean higherWins = setting != MovementSetting.ROLL_TIME_TO_COMPLETE;
+        Line.Sign sign = EffectDescriber.sign(value, calculation, higherWins);
+        return new Line(Line.Category.MOVEMENT, sign, "", d.amount(value, calculation), label,
+                setting.ordinal(), null, fromRank, true);
+    }
+
     public MovementSetting setting() {
         return setting;
     }

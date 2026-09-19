@@ -76,6 +76,21 @@ public final class StatEffect extends TalentEffect {
         return true;
     }
 
+    /**
+     * {@code "+20 Max health"}: the amount, then the bound and the stat.
+     * Green when the change is a gain by {@link StatLabels}, red otherwise;
+     * a stat the table does not know is a gain when the amount goes up.
+     */
+    @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        String name = d.label(description, "stat." + stat, EffectDescriber.humanise(stat));
+        String label = d.get("target." + target.id(), "stat", name);
+        double value = amount.at(rank);
+        Line.Sign sign = EffectDescriber.sign(value, calculation, StatLabels.higherWins(stat, target));
+        return new Line(Line.Category.STATS, sign, "", d.amount(value, calculation), label,
+                StatLabels.order(stat), null, fromRank, true);
+    }
+
     public String stat() {
         return stat;
     }

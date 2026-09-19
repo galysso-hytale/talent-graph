@@ -1,0 +1,5 @@
+{
+  "Interactions": [ "Example_Mend_2" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Example_Mend_2", "Cooldown": 8 }
+}

@@ -68,6 +68,19 @@ public final class EquipmentEffect extends TalentEffect {
         return true;
     }
 
+    /**
+     * {@code "Can use: swords, axes"} in green, {@code "Cannot use: …"} in
+     * red; the list is alphabetical in the player's language. A
+     * {@code "Description"} replaces the list, not the verb.
+     */
+    @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        String list = d.or(description, d.items(items, false, "list.and"));
+        String text = d.get(mode == Mode.ALLOW ? "equipment.allow" : "equipment.forbid", "items", list);
+        Line.Sign sign = mode == Mode.ALLOW ? Line.Sign.GAIN : Line.Sign.LOSS;
+        return new Line(Line.Category.EQUIPMENT, sign, "", text, "", Line.NO_ORDER, null, fromRank, true);
+    }
+
     public Mode mode() {
         return mode;
     }

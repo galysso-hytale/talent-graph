@@ -1,28 +1,62 @@
 {
     "Name": "Example",
     "Background": "Example/Background.png",
+    "Equipment": {
+        "Forbidden": ["Type=Weapon", "Type=Armor"],
+        "Allowed": ["Family=Sword", "Family=Dagger", "Family=Leather"]
+    },
     "Talents": [
         {
             "Id": "vigor",
             "Name": "Vigor",
-            "Icon": "Armor_Iron_Chest",
+            "Description": "Old scars, thick skin.",
+            "Details": "Each rank adds to your maximum health. From rank 2 you also regenerate: one point of health every two seconds, two at rank 3.",
+            "Icon": "Potion_Health",
             "MaxRank": 3,
             "Cost": [1, 2, 3],
             "Effects": [
                 { "Type": "Stat", "Stat": "Health", "Amount": [10, 20, 35] },
-                { "Type": "EntityEffect", "Id": "Example_Vigor_Regen", "FromRank": 2 }
+                { "Type": "EntityEffect", "Id": ["Example_Vigor_Regen_1", "Example_Vigor_Regen_1", "Example_Vigor_Regen_2"], "FromRank": 2 }
             ],
-            "X": 764,
-            "Y": 414
+            "X": 250,
+            "Y": 200
         },
         {
-            "Id": "spark",
-            "Name": "Spark",
-            "Icon": "Example/Spark.png",
-            "Cost": [2],
+            "Id": "second_wind",
+            "Name": "Second Wind",
+            "Description": "A little more breath.",
+            "Icon": "Potion_Stamina",
+            "Cost": [1],
             "Requires": ["vigor"],
-            "X": 1064,
-            "Y": 214
+            "Effects": [
+                { "Type": "Stat", "Stat": "Stamina", "Amount": 2 }
+            ],
+            "X": 550,
+            "Y": 70
+        },
+        {
+            "Id": "spring",
+            "Name": "Spring",
+            "Icon": "Ingredient_Feathers_Light",
+            "Cost": [1],
+            "Requires": ["second_wind"],
+            "Effects": [
+                { "Type": "Movement", "Setting": "JumpForce", "Amount": 1.1, "Calculation": "Multiplicative" }
+            ],
+            "X": 850,
+            "Y": 70
+        },
+        {
+            "Id": "marksman",
+            "Name": "Marksman",
+            "Icon": "Weapon_Bow_Iron",
+            "Cost": [2],
+            "Requires": ["spring"],
+            "Effects": [
+                { "Type": "Equipment", "Mode": "Allow", "Items": ["Family=Bow", "Family=Crossbow"] }
+            ],
+            "X": 1150,
+            "Y": 70
         },
         {
             "Id": "flaming_blade",
@@ -31,20 +65,180 @@
             "Cost": [2],
             "Requires": ["vigor"],
             "Effects": [
-                { "Type": "EntityEffect", "Id": "Example_Flaming_Blade" }
+                { "Type": "EntityEffect", "Id": "Example_Flaming_Blade", "Description": "Downward sword strikes set the target ablaze" }
             ],
-            "X": 1064,
-            "Y": 614
+            "X": 550,
+            "Y": 200
+        },
+        {
+            "Id": "berserk",
+            "Name": "Berserk",
+            "Description": "Pain is a rumour.",
+            "Icon": "Ingredient_Fire_Essence",
+            "Cost": [3],
+            "Requires": ["flaming_blade"],
+            "Effects": [
+                { "Type": "EntityEffect", "Id": "Example_Berserk", "Description": "Half the knockback taken" },
+                { "Type": "EntityEffect", "Id": "Example_Reckless", "Description": "Slower while swimming" }
+            ],
+            "X": 850,
+            "Y": 200
+        },
+        {
+            "Id": "iron_skin",
+            "Name": "Iron Skin",
+            "Description": "Heavy plates: more protection, less breath.",
+            "Icon": "Armor_Iron_Chest",
+            "Cost": [2],
+            "Requires": ["vigor"],
+            "Effects": [
+                { "Type": "Equipment", "Mode": "Allow", "Items": ["Family=Iron"] },
+                { "Type": "Stat", "Stat": "Stamina", "Amount": 0.9, "Calculation": "Multiplicative" }
+            ],
+            "X": 550,
+            "Y": 330
+        },
+        {
+            "Id": "oath_of_steel",
+            "Name": "Oath of Steel",
+            "Description": "Never again a weapon that strikes from afar.",
+            "Details": "The oath outranks Marksman: its Priority of 1 beats the Allow of a talent with the default priority of 0, so bows stay forbidden even with both unlocked.",
+            "Icon": "Weapon_Longsword_Iron",
+            "Cost": [3],
+            "Requires": ["iron_skin"],
+            "Effects": [
+                { "Type": "Stat", "Stat": "Health", "Amount": 25 },
+                { "Type": "Equipment", "Mode": "Forbid", "Items": ["Family=Bow", "Family=Crossbow"], "Priority": 1 }
+            ],
+            "X": 850,
+            "Y": 330
+        },
+        {
+            "Id": "attunement",
+            "Name": "Attunement",
+            "Description": "The first spark of the pool within.",
+            "Icon": "Potion_Mana",
+            "MaxRank": 3,
+            "Cost": [1, 1, 2],
+            "Effects": [
+                { "Type": "Stat", "Stat": "Mana", "Amount": [30, 60, 100] },
+                { "Type": "Equipment", "Mode": "Allow", "Items": ["Family=Staff", "Family=Wand", "Family=Magic"] }
+            ],
+            "X": 250,
+            "Y": 640
+        },
+        {
+            "Id": "arcane_bolt",
+            "Name": "Arcane Bolt",
+            "Icon": "Example/Spark.png",
+            "MaxRank": 3,
+            "Cost": [1, 2, 3],
+            "Requires": ["attunement"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Primary", "Interaction": ["Example_Bolt_1", "Example_Bolt_2", "Example_Bolt_3"],
+                  "HeldItem": ["Family=Staff", "Family=Magic"] }
+            ],
+            "X": 550,
+            "Y": 510
+        },
+        {
+            "Id": "ward",
+            "Name": "Ward",
+            "Icon": "Rock_Gem_Sapphire",
+            "Cost": [1],
+            "Requires": ["attunement"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Secondary", "Interaction": "Example_Ward",
+                  "HeldItem": ["Family=Staff", "Family=Magic"],
+                  "Description": "Ward: half damage for 4 s (3 stamina)" }
+            ],
+            "X": 550,
+            "Y": 640
+        },
+        {
+            "Id": "mend",
+            "Name": "Mend",
+            "Icon": "Ingredient_Life_Essence",
+            "MaxRank": 2,
+            "Cost": [1, 2],
+            "Requires": ["attunement"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Ability3", "Interaction": ["Example_Mend_1", "Example_Mend_2"],
+                  "HeldItem": ["Family=Staff", "Family=Magic", "Family=Mace"] }
+            ],
+            "X": 550,
+            "Y": 770
+        },
+        {
+            "Id": "nova",
+            "Name": "Nova",
+            "Icon": "Ingredient_Lightning_Essence",
+            "MaxRank": 2,
+            "Cost": [2, 3],
+            "Requires": ["arcane_bolt"],
+            "Effects": [
+                { "Type": "Stat", "Stat": "SignatureEnergy", "Amount": 10 },
+                { "Type": "Ability", "Slot": "Ability1", "Interaction": ["Example_Nova_1", "Example_Nova_2"],
+                  "HeldItem": ["Family=Staff", "Family=Magic"] }
+            ],
+            "X": 850,
+            "Y": 510
         },
         {
             "Id": "storm",
             "Name": "Storm",
-            "Icon": "Weapon_Sword_Iron",
-            "MaxRank": 2,
-            "Cost": [3, 4],
-            "Requires": ["spark", "flaming_blade"],
-            "X": 1364,
-            "Y": 414
+            "Description": "The flame staff remembers.",
+            "Details": "Storm names the flame staff by id and takes Priority 1, so on that one staff the signature key casts Storm rather than Nova; every other staff keeps Nova.",
+            "Icon": "Weapon_Staff_Crystal_Flame",
+            "Cost": [3],
+            "Requires": ["nova"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Ability1", "Interaction": "Example_Storm",
+                  "HeldItem": ["Weapon_Staff_Crystal_Flame"], "Priority": 1 }
+            ],
+            "X": 1150,
+            "Y": 510
+        },
+        {
+            "Id": "focus",
+            "Name": "Focus",
+            "Icon": "Potion_Mana_Small",
+            "Cost": [1],
+            "Requires": ["ward"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Pick", "Interaction": "Example_Focus",
+                  "Description": "Focus: 25 mana back, once every 30 s (adventure mode; creative keeps picking blocks)" }
+            ],
+            "X": 850,
+            "Y": 640
+        },
+        {
+            "Id": "blink",
+            "Name": "Blink",
+            "Description": "A step through the veil.",
+            "Details": "A short dash forward, invulnerable for its duration, with anything in hand or nothing at all. Costs 4 stamina.",
+            "Icon": "Weapon_Daggers_Cobalt",
+            "Cost": [2],
+            "Requires": ["ward"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Ability2", "Interaction": "Example_Blink" }
+            ],
+            "X": 850,
+            "Y": 770
+        },
+        {
+            "Id": "battle_mage",
+            "Name": "Battle Mage",
+            "Description": "Steel in one hand, the storm in the other.",
+            "Icon": "Weapon_Sword_Adamantite",
+            "Cost": [3],
+            "Requires": ["nova", "berserk"],
+            "Effects": [
+                { "Type": "Ability", "Slot": "Ability1", "Interaction": "Example_Blade_Nova", "HeldItem": ["Family=Sword"],
+                  "Description": "Blade Nova: the sword's own signature, then a small nova" }
+            ],
+            "X": 1150,
+            "Y": 400
         }
     ]
 }

@@ -6,6 +6,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.protocol.InteractionType;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -104,6 +105,34 @@ public final class AbilityEffect extends TalentEffect {
             }
         }
         return null;
+    }
+
+    /**
+     * {@code "[Q] Nova — with a staff in hand · 12 s cooldown"}: the default
+     * key of the slot (the panel shows the configured one), the name of
+     * the rank's root interaction ({@code "Description"}, else a
+     * translation under {@code talentgraph.ability.<Id>}, else the id as
+     * words), then the conditions the effect states: the item to hold and
+     * the root's cooldown. Costs and other conditions live inside the
+     * interaction chain and are not read; the {@code "Description"} is
+     * where to write them. Always a gain.
+     */
+    @Override
+    protected Line describe(EffectDescriber d, int rank) {
+        String id = interactionAt(rank);
+        String name = d.label(description, "ability." + id, EffectDescriber.humanise(id));
+        List<String> conditions = new ArrayList<>();
+        if (!heldItem.isEmpty()) {
+            conditions.add(d.get("ability.heldItem", "items", d.items(heldItem, true, "list.or")));
+        }
+        double cooldown = d.refs().rootCooldown(id);
+        if (cooldown > 0) {
+            conditions.add(d.get("ability.cooldown", "time", d.seconds(cooldown)));
+        }
+        String suffix = conditions.isEmpty() ? ""
+                : d.get("ability.conditions", "conditions", String.join(d.get("ability.conditionSeparator"), conditions));
+        return new Line(Line.Category.ABILITIES, Line.Sign.GAIN, d.get("ability.key", "key", d.key(slot)), name, suffix,
+                SLOTS.indexOf(slot), slot, fromRank, true);
     }
 
     public InteractionType slot() {

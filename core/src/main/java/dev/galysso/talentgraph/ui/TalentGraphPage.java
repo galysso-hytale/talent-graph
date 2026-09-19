@@ -10,6 +10,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPage;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageEvent;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageEventType;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
@@ -21,6 +22,7 @@ import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.PlayerTalents;
@@ -28,9 +30,15 @@ import dev.galysso.talentgraph.api.Talent;
 import dev.galysso.talentgraph.api.TalentException;
 import dev.galysso.talentgraph.api.TalentGraph;
 import dev.galysso.talentgraph.api.TalentId;
+import dev.galysso.talentgraph.asset.GraphEffects;
 import dev.galysso.talentgraph.asset.GraphProblem;
 import dev.galysso.talentgraph.asset.GraphReport;
 import dev.galysso.talentgraph.asset.LoadedGraph;
+import dev.galysso.talentgraph.effect.AbilityEffect;
+import dev.galysso.talentgraph.effect.Line;
+import dev.galysso.talentgraph.effect.References;
+import dev.galysso.talentgraph.effect.TalentEffect;
+import dev.galysso.talentgraph.effect.Texts;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -39,6 +47,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -76,9 +85,13 @@ import java.util.logging.Level;
  * touching them, plus the affordance of every other node since the point
  * balance changed, and the minimap dots.</p>
  *
- * <p>Only a talent the player can unlock right now reacts to the cursor: its
- * {@code #Action} overlay is the sole node element bound to an event.
- * Everything else is inert and explains itself through its tooltip.</p>
+ * <p>Only a talent the player can unlock right now reacts to the left
+ * click: its {@code #Action} overlay is the sole node element bound to it.
+ * Every node explains itself through the hover card, a tooltip the page
+ * draws itself beside the node when the cursor enters it: what its effects
+ * give (see {@link TalentTooltip}) and what the player can do. A right
+ * click opens the detail panel: the same lines with the values of every
+ * rank and the longer texts of the file.</p>
  *
  * <p>The page also serves the author of the graph (see {@code LiveReload}):
  * given a {@link GraphReport} with problems, it marks the faulty nodes,
@@ -94,6 +107,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
     private static final LinkRenderer LINKS = new SpriteLinkRenderer();
     private static final String ACTION_CLOSE = "Close";
+    private static final String ACTION_CLOSE_DETAIL = "CloseDetail";
     /** Logs the minimap clicks, a debugging aid. */
     private static final boolean LOG_NAVIGATION = false;
 
@@ -102,6 +116,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     static final int VIEWPORT_HEIGHT = 864;
     /** Badges hold text, which does not scale: they only show above this zoom. */
     private static final double BADGE_MIN_ZOOM = 0.5;
+    /** Hover card: width, gap to the node and margin to the stage edges; must match {@code #HoverCard}. */
+    private static final int CARD_WIDTH = 360;
+    private static final int CARD_GAP = 10;
+    private static final int CARD_MARGIN = 8;
 
     /** Minimap size in screen units; must match {@code #Minimap} in the page markup. */
     private static final int MINIMAP_WIDTH = 300;
@@ -158,10 +176,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private static final int BADGE_HEIGHT = 16;
     private static final int RANK_BADGE_WIDTH = 30;
     private static final int ICON_SIZE = 64;
-    private static final String COLOR_TITLE = "#f0f4ff";
-    private static final String COLOR_MUTED = "#96a9be";
-    private static final String COLOR_OK = "#3fa86f";
-    private static final String COLOR_BLOCKED = "#e05a5a";
+    private static final String COLOR_TITLE = TalentTooltip.COLOR_TITLE;
+    private static final String COLOR_MUTED = TalentTooltip.COLOR_MUTED;
+    private static final String COLOR_OK = TalentTooltip.COLOR_GAIN;
+    private static final String COLOR_BLOCKED = TalentTooltip.COLOR_LOSS;
     private static final String COLOR_WARNING = "#f2c94c";
     /** Lines of the banner tooltip, past which the log is the place to look. */
     private static final int MAX_BANNER_LINES = 20;
@@ -179,6 +197,18 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     /** A graph with errors is shown to be fixed, not played. */
     private final boolean preview;
     private final PlayerTalents talents;
+    /** What the talents do, for the tooltips and the panel. */
+    private final GraphEffects effects;
+    /** The words of this player's language. */
+    private final TalentTooltip words;
+    /** The lines of each talent at each rank, computed once per page; keyed by talent and rank. */
+    private final Map<String, List<Line>> lineCache = new HashMap<>();
+    /** The talent the detail panel shows, or null while it is closed. */
+    @Nullable
+    private TalentId detailTalent;
+    /** The talent under the cursor, whose card is shown, or null. */
+    @Nullable
+    private TalentId hoverTalent;
     /** Talents in a fixed order, the one of the minimap dots. */
     private final List<Talent> order;
     /** Talents that list each talent as a prerequisite. */
@@ -235,6 +265,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         this.live = live;
         this.preview = report.hasErrors();
         this.talents = talents;
+        this.effects = view.effects();
+        this.words = new TalentTooltip(References.LIVE, Texts.of(playerRef.getLanguage()));
         this.order = new ArrayList<>(graph.talents());
         order.sort(Comparator.comparing(t -> t.id().toString()));
         for (Talent talent : order) {
@@ -277,10 +309,17 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
      */
     public TalentGraphPage successor(LoadedGraph view, boolean live) {
         Camera.View current;
+        TalentId detail;
         synchronized (this) {
             current = camera.view();
+            detail = detailTalent;
         }
-        return new TalentGraphPage(playerRef, view, talents, current, live, navigator);
+        TalentGraphPage next = new TalentGraphPage(playerRef, view, talents, current, live, navigator);
+        // The panel stays open on the same talent, with the reloaded words.
+        if (detail != null && view.graph().talent(detail).isPresent()) {
+            next.detailTalent = detail;
+        }
+        return next;
     }
 
     /**
@@ -372,8 +411,11 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                     EventData.of("Graph", "next"), false);
         }
         updatePoints(commands);
+        commands.set("#DetailHint.Text", words.texts().get("talentgraph.panel.hint"));
         events.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                 EventData.of("Action", ACTION_CLOSE), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#DetailClose",
+                EventData.of("Action", ACTION_CLOSE_DETAIL), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#ZoomIn",
                 EventData.of("Zoom", "in"), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#ZoomOut",
@@ -385,6 +427,9 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         updateZoomControls(commands);
         updateBanner(commands);
         renderCanvas(commands, events);
+        if (detailTalent != null) {
+            updateDetail(commands);
+        }
     }
 
     @Override
@@ -392,6 +437,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                                 @Nonnull Event event) {
         if (ACTION_CLOSE.equals(event.action)) {
             close();
+        } else if (ACTION_CLOSE_DETAIL.equals(event.action)) {
+            showDetail(null);
+        } else if (event.detail != null) {
+            toggleDetail(event.detail);
+        } else if (event.hover != null) {
+            hover(event.hover);
+        } else if (event.leave != null) {
+            leave(event.leave);
         } else if (event.unlock != null) {
             unlock(event.unlock);
         } else if (event.zoom != null) {
@@ -419,6 +472,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         updateZoomControls(commands);
         updateMinimapWindow(commands);
         renderCanvas(commands, events);
+        hideHover(commands);
         sendUpdate(commands, events, false);
     }
 
@@ -495,6 +549,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         if (followHintStale) {
             updateFollowHint(commands); // ride along rather than cost an update of its own
         }
+        hideHover(commands); // the node moves away from under the card
         // Straight to the wire rather than through sendUpdate, which would
         // wait for the world thread and its once-a-tick flush.
         pages.updateCustomPage(new CustomPage(getClass().getName(), false, false, getLifetime(),
@@ -534,13 +589,18 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
 
     // ---- unlocking ----
 
-    private void unlock(String id) {
-        Talent talent;
+    /** {@return the talent an event names, or null for a stale or forged one} */
+    @Nullable
+    private Talent talentOf(String id) {
         try {
-            talent = graph.talent(TalentId.parse(id)).orElse(null);
+            return graph.talent(TalentId.parse(id)).orElse(null);
         } catch (IllegalArgumentException e) {
-            talent = null;
+            return null;
         }
+    }
+
+    private void unlock(String id) {
+        Talent talent = talentOf(id);
         if (talent == null) {
             return; // stale or forged event, nothing to do
         }
@@ -569,7 +629,233 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             }
         }
         updateMinimapDots(commands);
+        if (detailTalent != null) {
+            updateDetail(commands);
+        }
+        if (hoverTalent != null) {
+            updateHover(commands); // the rank, and what the next click gives, changed
+        }
         sendUpdate(commands, null, false);
+    }
+
+    // ---- hover card ----
+
+    /** The cursor entered a node: show its card. */
+    private synchronized void hover(String id) {
+        Talent talent = talentOf(id);
+        if (talent == null || talent.id().equals(hoverTalent)) {
+            return;
+        }
+        hoverTalent = talent.id();
+        UICommandBuilder commands = new UICommandBuilder();
+        updateHover(commands);
+        sendUpdate(commands, null, false);
+    }
+
+    /**
+     * The cursor left a node: hide the card, unless another node was
+     * entered first (the two events may cross).
+     */
+    private synchronized void leave(String id) {
+        Talent talent = talentOf(id);
+        if (talent == null || !talent.id().equals(hoverTalent)) {
+            return;
+        }
+        UICommandBuilder commands = new UICommandBuilder();
+        hideHover(commands);
+        sendUpdate(commands, null, false);
+    }
+
+    private void hideHover(UICommandBuilder commands) {
+        if (hoverTalent != null) {
+            hoverTalent = null;
+            commands.set("#Hover.Visible", false);
+        }
+    }
+
+    /**
+     * Fills and places the card for {@link #hoverTalent}: title, rank, the
+     * talent's description, the problems of its file entry, what its
+     * effects give at the rank the click would reach, and what the player
+     * can do. Beside the node, on the side with room, kept inside the stage.
+     */
+    private void updateHover(UICommandBuilder commands) {
+        Talent talent = hoverTalent == null ? null : graph.talent(hoverTalent).orElse(null);
+        if (talent == null || !nodeIndex.containsKey(talent.id())) {
+            hideHover(commands);
+            return;
+        }
+        int rank = talents.rank(talent.id());
+        NodeState state = stateOf(talent, rank);
+        GraphEffects.Blurb blurb = effects.blurb(talent.id());
+        commands.set("#HoverTitle.Text", talent.displayName());
+        commands.set("#HoverRank.Visible", talent.maxRank() > 1);
+        if (talent.maxRank() > 1) {
+            commands.set("#HoverRank.Text", "Rank " + rank + "/" + talent.maxRank());
+        }
+        String lore = words.written(blurb.description());
+        commands.set("#HoverLore.Visible", lore != null);
+        commands.set("#HoverLore.Text", lore != null ? lore : "");
+        List<GraphProblem> problems = report.of(talent.id());
+        commands.set("#HoverProblems.Visible", !problems.isEmpty());
+        if (!problems.isEmpty()) {
+            Message text = Message.empty();
+            for (int i = 0; i < problems.size(); i++) {
+                GraphProblem problem = problems.get(i);
+                text.insert(Message.raw((i > 0 ? "\n" : "") + problem.message())
+                        .color(problem.isError() ? COLOR_BLOCKED : COLOR_WARNING));
+            }
+            commands.set("#HoverProblems.TextSpans", text);
+        }
+        List<Line> lines = lines(talent, rank);
+        int rows = fillBody(commands, "#Hover", words.rows(lines));
+        commands.set("#HoverSepTop.Visible", rows > 0);
+        commands.set("#HoverSepBottom.Visible", rows > 0);
+        commands.set("#HoverState.TextSpans", stateLine(talent, rank, state));
+
+        // Rough height, for keeping the card inside the stage: the layout
+        // decides the real one.
+        int height = 36 + 26 + (talent.maxRank() > 1 ? 18 : 0) + (lore != null ? 40 : 0) + problems.size() * 19
+                + (rows > 0 ? 24 + rows * 22 + categories(lines) * 40 : 0) + 22;
+        int size = camera.scale(GraphLayout.NODE_SIZE);
+        GraphLayout.Point p = position(talent);
+        int nodeLeft = camera.screenX(p.x());
+        int nodeTop = camera.screenY(p.y());
+        int left = nodeLeft + size + CARD_GAP;
+        if (left + CARD_WIDTH > VIEWPORT_WIDTH - CARD_MARGIN) {
+            left = nodeLeft - CARD_GAP - CARD_WIDTH;
+        }
+        int top = Math.max(CARD_MARGIN, Math.min(nodeTop, VIEWPORT_HEIGHT - CARD_MARGIN - height));
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(left));
+        anchor.setTop(Value.of(top));
+        anchor.setWidth(Value.of(CARD_WIDTH));
+        anchor.setBottom(Value.of(0));
+        commands.setObject("#Hover.Anchor", anchor);
+        commands.set("#Hover.Visible", true);
+    }
+
+    private static int categories(List<Line> lines) {
+        Set<Line.Category> seen = new HashSet<>();
+        for (Line line : lines) {
+            seen.add(line.category());
+        }
+        return seen.size();
+    }
+
+    /**
+     * Fills the category groups of a body ({@code #Hover…} or
+     * {@code #Detail…}): a group per category with a heading and the rows
+     * as coloured spans, the abilities as one row per slot, the first
+     * shown group without its separator.
+     *
+     * @return the number of rows shown
+     */
+    private int fillBody(UICommandBuilder commands, String prefix, List<TalentTooltip.Row> rows) {
+        boolean first = true;
+        int shown = 0;
+        for (Line.Category category : Line.Category.values()) {
+            String group = prefix + category.name().charAt(0) + category.name().substring(1).toLowerCase(Locale.ROOT);
+            Message text = Message.empty();
+            boolean any = false;
+            Map<String, Message> bySlot = new HashMap<>();
+            for (TalentTooltip.Row row : rows) {
+                if (row.line().category() != category) {
+                    continue;
+                }
+                if (category == Line.Category.ABILITIES && row.line().slot() != null) {
+                    Message existing = bySlot.get(row.line().slot().name());
+                    if (existing == null) {
+                        bySlot.put(row.line().slot().name(), row.message());
+                    } else {
+                        existing.insert(Message.raw("\n")).insert(row.message());
+                    }
+                } else {
+                    if (any) {
+                        text.insert(Message.raw("\n"));
+                    }
+                    text.insert(row.message());
+                }
+                any = true;
+                shown++;
+            }
+            commands.set(group + ".Visible", any);
+            if (!any) {
+                continue;
+            }
+            commands.set(group + " #Sep.Visible", !first);
+            first = false;
+            commands.set(group + " #Heading.Text", words.heading(category));
+            if (category == Line.Category.ABILITIES) {
+                for (InteractionType slot : AbilityEffect.SLOTS) {
+                    Message row = bySlot.get(slot.name());
+                    commands.set(group + " #Slot" + slot.name() + ".Visible", row != null);
+                    if (row != null) {
+                        commands.set(group + " #Slot" + slot.name() + " #Text.TextSpans", row);
+                        // Keyboard slots carry the default key as text; mouse slots have their glyph.
+                        if (slot != InteractionType.Primary && slot != InteractionType.Secondary
+                                && slot != InteractionType.Pick) {
+                            commands.set(group + " #Slot" + slot.name() + " #Key.Text",
+                                    words.texts().get("talentgraph.key." + slot.name()));
+                        }
+                    }
+                }
+            } else {
+                commands.set(group + " #Text.TextSpans", text);
+            }
+        }
+        return shown;
+    }
+
+    // ---- detail panel ----
+
+    /** A right click on a node: opens the panel on it, or closes it when it already shows it. */
+    private void toggleDetail(String id) {
+        Talent talent = talentOf(id);
+        if (talent == null) {
+            return; // stale or forged event
+        }
+        showDetail(talent.id().equals(detailTalent) ? null : talent.id());
+    }
+
+    private synchronized void showDetail(@Nullable TalentId id) {
+        detailTalent = id;
+        UICommandBuilder commands = new UICommandBuilder();
+        updateDetail(commands);
+        hideHover(commands); // the card would sit on the node the panel is about
+        sendUpdate(commands, null, false);
+    }
+
+    /**
+     * Fills the panel for {@link #detailTalent}, or hides it. Every element
+     * is set each time: the panel is one group whose parts show or hide with
+     * the talent.
+     */
+    private void updateDetail(UICommandBuilder commands) {
+        Talent talent = detailTalent == null ? null : graph.talent(detailTalent).orElse(null);
+        commands.set("#Detail.Visible", talent != null);
+        if (talent == null) {
+            detailTalent = null;
+            return;
+        }
+        int rank = talents.rank(talent.id());
+        GraphEffects.Blurb blurb = effects.blurb(talent.id());
+        commands.set("#DetailTitle.Text", talent.displayName());
+        commands.set("#DetailRank.Visible", talent.maxRank() > 1);
+        if (talent.maxRank() > 1) {
+            commands.set("#DetailRank.Text", "Rank " + rank + "/" + talent.maxRank());
+        }
+        String lore = words.written(blurb.description());
+        commands.set("#DetailLore.Visible", lore != null);
+        commands.set("#DetailLore.Text", lore != null ? lore : "");
+        String more = words.written(blurb.details());
+        commands.set("#DetailMore.Visible", more != null);
+        commands.set("#DetailMore.Text", more != null ? more : "");
+        commands.set("#DetailSepBottom.Visible", more != null);
+
+        List<TalentTooltip.Row> rows = words.panelRows(effects.of(talent.id()), rank, talent.maxRank());
+        commands.set("#DetailSepTop.Visible", !rows.isEmpty() || more != null);
+        fillBody(commands, "#Detail", rows);
     }
 
     // ---- canvas ----
@@ -581,6 +867,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
      */
     private void renderCanvas(UICommandBuilder commands, UIEventBuilder events) {
         commands.clear("#Graph");
+        hideHover(commands);
         placeContent(commands);
         linkIndex.clear();
         nodeIndex.clear();
@@ -630,6 +917,16 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             updateNode(commands, talent);
             events.addEventBinding(CustomUIEventBindingType.Activating, selector + " #Action",
                     EventData.of("Unlock", talent.id().toString()), false);
+            // The cursor and the right click reach whichever element is on
+            // top: the visible state frame, or the action overlay.
+            String id = talent.id().toString();
+            for (String element : new String[] {"Action", NodeState.LOCKED.element(), NodeState.AVAILABLE.element(),
+                    NodeState.UNLOCKED.element(), NodeState.MAXED.element()}) {
+                String target = selector + " #" + element;
+                events.addEventBinding(CustomUIEventBindingType.MouseEntered, target, EventData.of("Hover", id), false);
+                events.addEventBinding(CustomUIEventBindingType.MouseExited, target, EventData.of("Leave", id), false);
+                events.addEventBinding(CustomUIEventBindingType.RightClicking, target, EventData.of("Detail", id), false);
+            }
         }
         // Ghosts last, on top: a node with the dashed frame and the missing icon.
         for (GraphReport.Ghost ghost : report.ghosts()) {
@@ -643,6 +940,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                     .orElse(ghost.dependent().toString());
             commands.set(selector + " #Ghost.TooltipTextSpans", Message.empty()
                     .insert(Message.raw(ghost.reference()).bold(true).color(COLOR_TITLE))
+                    .insert(Message.raw("\n"))
                     .insert(blocked("No talent has this id; " + dependent + " requires it")));
         }
     }
@@ -745,12 +1043,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         }
         boolean actionable = affordable && state != NodeState.LOCKED && !preview;
         commands.set(selector + " #Action.Visible", actionable);
-        // The overlay sits above the frame, so whichever is hit must carry the tooltip.
-        Message tooltip = tooltip(talent, rank, state, affordable);
-        commands.set(selector + " #" + state.element() + ".TooltipTextSpans", tooltip);
-        if (actionable) {
-            commands.set(selector + " #Action.TooltipTextSpans", tooltip);
-        }
     }
 
     /** Clears and redraws every link ending at {@code talent}, if any. */
@@ -950,48 +1242,50 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     }
 
     /**
-     * Bold title, muted rank line for multi-rank talents, then one line that
-     * says what the player can do: red italics when nothing (and why), green
-     * when the talent is unlockable or already done.
+     * The last line of the card: what the player can do with the node.
+     * Red italics when nothing (and why), green when the talent is
+     * unlockable or already done, muted for a preview.
      */
-    private Message tooltip(Talent talent, int rank, NodeState state, boolean affordable) {
-        Message tip = Message.empty()
-                .insert(Message.raw(talent.displayName()).bold(true).color(COLOR_TITLE));
-        if (talent.maxRank() > 1) {
-            tip.insert(Message.raw("\nRank " + rank + "/" + talent.maxRank()).color(COLOR_MUTED));
-        }
-        for (GraphProblem problem : report.of(talent.id())) {
-            tip.insert(Message.raw("\n" + problem.message()).color(problem.isError() ? COLOR_BLOCKED : COLOR_WARNING));
-        }
+    private Message stateLine(Talent talent, int rank, NodeState state) {
         if (preview) {
-            return tip.insert(Message.raw("\nPreview: fix the file to play").italic(true).color(COLOR_MUTED));
+            return Message.raw("Preview: fix the file to play").italic(true).color(COLOR_MUTED);
         }
         return switch (state) {
-            case MAXED -> tip.insert(ok(talent.maxRank() > 1 ? "Max rank reached" : "Already unlocked"));
+            case MAXED -> ok(talent.maxRank() > 1 ? "Max rank reached" : "Already unlocked");
             case LOCKED -> {
                 List<String> names = new ArrayList<>();
                 for (TalentId prerequisite : talent.prerequisites()) {
                     names.add(graph.talent(prerequisite).map(Talent::displayName)
                             .orElse(prerequisite.toString()));
                 }
-                yield tip.insert(blocked("Requires " + String.join(", ", names)));
+                yield blocked("Requires " + String.join(", ", names));
             }
             case AVAILABLE, UNLOCKED -> {
                 int cost = talent.costOfRank(rank + 1);
-                yield tip.insert(affordable
+                yield cost <= talents.availablePoints()
                         ? ok((rank > 0 ? "Click to upgrade" : "Click to unlock") + " (" + cost + " point(s))")
                         : blocked("Not enough points (" + cost + " needed, "
-                                + talents.availablePoints() + " available)"));
+                                + talents.availablePoints() + " available)");
             }
         };
     }
 
+    /** The effect lines of a talent at a rank, described once per page. */
+    private List<Line> lines(Talent talent, int rank) {
+        List<TalentEffect> list = effects.of(talent.id());
+        if (list.isEmpty()) {
+            return List.of();
+        }
+        return lineCache.computeIfAbsent(talent.id() + "#" + rank,
+                k -> words.lines(list, rank, talent.maxRank()));
+    }
+
     private static Message ok(String text) {
-        return Message.raw("\n" + text).color(COLOR_OK);
+        return Message.raw(text).color(COLOR_OK);
     }
 
     private static Message blocked(String text) {
-        return Message.raw("\n" + text).italic(true).color(COLOR_BLOCKED);
+        return Message.raw(text).italic(true).color(COLOR_BLOCKED);
     }
 
     /** Whether the progress of {@code talent} is shown as pips rather than text. */
@@ -1064,6 +1358,9 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
                 .append(new KeyedCodec<>("Follow", Codec.STRING, false), (e, v) -> e.toggle = v, e -> e.toggle).add()
                 .append(new KeyedCodec<>("Enter", Codec.STRING, false), (e, v) -> e.enter = v, e -> e.enter).add()
                 .append(new KeyedCodec<>("Graph", Codec.STRING, false), (e, v) -> e.graph = v, e -> e.graph).add()
+                .append(new KeyedCodec<>("Detail", Codec.STRING, false), (e, v) -> e.detail = v, e -> e.detail).add()
+                .append(new KeyedCodec<>("Hover", Codec.STRING, false), (e, v) -> e.hover = v, e -> e.hover).add()
+                .append(new KeyedCodec<>("Leave", Codec.STRING, false), (e, v) -> e.leave = v, e -> e.leave).add()
                 .build();
 
         private String unlock;
@@ -1078,5 +1375,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         private String enter;
         /** {@code "prev"} or {@code "next"}: the header arrows. */
         private String graph;
+        /** The talent right-clicked: toggles the detail panel. */
+        private String detail;
+        /** The talent the cursor entered or left: shows or hides the hover card. */
+        private String hover;
+        private String leave;
     }
 }

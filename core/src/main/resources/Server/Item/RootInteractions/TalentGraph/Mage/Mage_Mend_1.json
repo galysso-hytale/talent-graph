@@ -1,5 +1,0 @@
-{
-  "Interactions": [ "Mage_Mend_1" ],
-  "RequireNewClick": true,
-  "Cooldown": { "Id": "Mage_Mend_1", "Cooldown": 8 }
-}

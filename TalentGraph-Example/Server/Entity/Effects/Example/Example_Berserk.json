@@ -1,0 +1,10 @@
+{
+  "$Comment": "Visible capstone: a HUD icon, a red tint, half the knockback taken. Name is what the tooltip shows when no translation covers the id.",
+  "Name": "Berserk",
+  "Infinite": true,
+  "StatusEffectIcon": "UI/StatusEffects/Burn.png",
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff5a3c",
+    "KnockbackMultiplier": 0.5
+  }
+}

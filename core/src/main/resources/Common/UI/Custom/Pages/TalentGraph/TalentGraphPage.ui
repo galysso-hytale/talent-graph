@@ -20,6 +20,150 @@ $C = "../../Common.ui";
   TextColor: #ffffff(0.8)
 );
 
+// Detail panel: the title of the talent and its category headings.
+@PanelTitleStyle = LabelStyle(
+  FontSize: 18,
+  RenderBold: true,
+  HorizontalAlignment: Center,
+  TextColor: #f0f4ff,
+  Wrap: true
+);
+
+@PanelMutedStyle = LabelStyle(
+  FontSize: 13,
+  HorizontalAlignment: Center,
+  TextColor: #96a9be,
+  Wrap: true
+);
+
+@PanelTextStyle = LabelStyle(
+  FontSize: 14,
+  TextColor: #c9d4e0,
+  Wrap: true
+);
+
+// One category of the panel: a thin separator (hidden on the first one
+// shown), a heading in small capitals, the lines as coloured spans.
+@PanelCategory = Group {
+  @Heading = "";
+  @Text = "";
+
+  Visible: false;
+  LayoutMode: Top;
+
+  $C.@ContentSeparator #Sep {
+    @Anchor = Anchor(Top: 8, Bottom: 8);
+  }
+
+  Label #Heading {
+    Style: (...$C.@SubtitleStyle, FontSize: 13);
+    Anchor: (Bottom: 4);
+    Text: @Heading;
+  }
+
+  Label #Text {
+    Style: @PanelTextStyle;
+    Text: @Text;
+  }
+};
+
+// One ability row of the panel: the key, then the ability. Six rows, one
+// per slot, shown when the talent uses the slot. A keyboard slot shows the
+// default key of the slot in the key-cap frame of the tool legends (the
+// client's HotkeyLabel, which would show the bound key, renders an empty
+// frame outside the HUD and refuses a Style); a mouse slot shows the
+// game's mouse glyph, as the legends do.
+@PanelSlotText = Group {
+  FlexWeight: 1;
+  LayoutMode: Middle;
+
+  Label #Text {
+    Style: @PanelTextStyle;
+    Text: "";
+  }
+};
+
+@PanelSlot = Group {
+  Visible: false;
+  LayoutMode: Left;
+  Anchor: (Top: 4);
+
+  Group {
+    LayoutMode: MiddleCenter;
+    Padding: (Horizontal: 6, Vertical: 4);
+    Anchor: (MinWidth: 48, Right: 10);
+    Background: (TexturePath: "../../Common/InputBinding.png", Border: 6);
+
+    Label #Key {
+      Style: (FontSize: 14, RenderBold: true, RenderUppercase: true, FontName: "Secondary", TextColor: #ffffff(0.8));
+      Text: "";
+    }
+  }
+
+  @PanelSlotText {
+  }
+};
+
+@PanelMouseSlot = Group {
+  @Icon = "";
+
+  Visible: false;
+  LayoutMode: Left;
+  Anchor: (Top: 4);
+
+  Group {
+    LayoutMode: MiddleCenter;
+    Anchor: (Width: 48, Right: 10);
+
+    Group {
+      Anchor: (Width: 22, Height: 22);
+      Background: (TexturePath: @Icon);
+    }
+  }
+
+  @PanelSlotText {
+  }
+};
+
+// The abilities of a talent: one row per slot, mouse glyphs for the mouse
+// slots, the default key for the keyboard ones. Shared by the hover card
+// and the detail panel.
+@AbilitiesBlock = Group {
+  Visible: false;
+  LayoutMode: Top;
+
+  $C.@ContentSeparator #Sep {
+    @Anchor = Anchor(Top: 8, Bottom: 8);
+  }
+
+  Label #Heading {
+    Style: (...$C.@SubtitleStyle, FontSize: 13);
+    Anchor: (Bottom: 4);
+    Text: "";
+  }
+
+  @PanelMouseSlot #SlotPrimary {
+    @Icon = "../../Common/SmallInputIconMouseLeftClick.png";
+  }
+
+  @PanelMouseSlot #SlotSecondary {
+    @Icon = "../../Common/SmallInputIconMouseRightClick.png";
+  }
+
+  @PanelSlot #SlotAbility1 {
+  }
+
+  @PanelSlot #SlotAbility2 {
+  }
+
+  @PanelSlot #SlotAbility3 {
+  }
+
+  @PanelMouseSlot #SlotPick {
+    @Icon = "../../Common/SmallInputIconMouseMiddleClick.png";
+  }
+};
+
 $C.@PageOverlay {
   LayoutMode: Middle;
 
@@ -78,6 +222,13 @@ $C.@PageOverlay {
 
         Group {
           FlexWeight: 1;
+          LayoutMode: Center;
+
+          // How to open the detail panel; the server fills the words.
+          Label #DetailHint {
+            Style: (...@HintStyle, TextColor: #89899f);
+            Text: "";
+          }
         }
 
         // Zoom by steps, centred in the header: two large targets beat a
@@ -256,6 +407,151 @@ $C.@PageOverlay {
             Anchor: (Left: 4);
             Style: (...@HintStyle, TextColor: #f2c94c);
             Text: "Stop following";
+          }
+        }
+
+        // The detailed view of one talent, opened by a right click on its
+        // node and closed by another, by the cross, or by opening another
+        // talent. It holds what the tooltip cannot: the keys as the client
+        // has them bound, the values of every rank, the longer texts.
+        Group #Detail {
+          Visible: false;
+          Anchor: (Right: 12, Top: 12, Width: 440, Bottom: 240);
+          Background: (TexturePath: "Node/Badge.png", Border: 6);
+
+          Group {
+            Anchor: (Left: 16, Top: 16, Right: 16, Bottom: 16);
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+            Label #DetailTitle {
+              Style: @PanelTitleStyle;
+              Text: "";
+            }
+
+            Label #DetailRank {
+              Visible: false;
+              Style: @PanelMutedStyle;
+              Anchor: (Top: 2);
+              Text: "";
+            }
+
+            Label #DetailLore {
+              Visible: false;
+              Style: (...@PanelTextStyle, RenderItalics: true, HorizontalAlignment: Center);
+              Anchor: (Top: 8);
+              Text: "";
+            }
+
+            $C.@PanelSeparatorFancy #DetailSepTop {
+              @Anchor = Anchor(Top: 12, Bottom: 4);
+              Visible: false;
+            }
+
+            @PanelCategory #DetailStats {
+            }
+
+            @PanelCategory #DetailMovement {
+            }
+
+            @PanelCategory #DetailEffects {
+            }
+
+            @PanelCategory #DetailEquipment {
+            }
+
+            @AbilitiesBlock #DetailAbilities {
+            }
+
+            $C.@PanelSeparatorFancy #DetailSepBottom {
+              @Anchor = Anchor(Top: 12, Bottom: 8);
+              Visible: false;
+            }
+
+            Label #DetailMore {
+              Visible: false;
+              Style: @PanelTextStyle;
+              Text: "";
+            }
+          }
+
+          $C.@CloseButton #DetailClose {
+            Anchor: (Top: -10, Right: -10, Width: 32, Height: 32);
+          }
+        }
+
+        // The hover card: the tooltip of a node, drawn by the page rather
+        // than by the client so that it can hold separators, glyphs and
+        // colours. Shown on MouseEntered of a node, anchored beside it by
+        // the server, hidden on MouseExited. The outer group stretches to
+        // the bottom of the stage so that the card inside takes the height
+        // of its content.
+        Group #Hover {
+          Visible: false;
+          LayoutMode: Top;
+
+          Group #HoverCard {
+            Background: (TexturePath: "../../Common/TooltipDefaultBackground.png", Border: 24);
+            Padding: (Full: 18);
+            LayoutMode: Top;
+
+            Label #HoverTitle {
+              Style: (...@PanelTitleStyle, FontSize: 16);
+              Text: "";
+            }
+
+            Label #HoverRank {
+              Visible: false;
+              Style: @PanelMutedStyle;
+              Anchor: (Top: 2);
+              Text: "";
+            }
+
+            Label #HoverLore {
+              Visible: false;
+              Style: (...@PanelTextStyle, RenderItalics: true, HorizontalAlignment: Center);
+              Anchor: (Top: 6);
+              Text: "";
+            }
+
+            // Author aid: the problems of the node's entry in the file.
+            Label #HoverProblems {
+              Visible: false;
+              Style: @PanelTextStyle;
+              Anchor: (Top: 6);
+              Text: "";
+            }
+
+            $C.@PanelSeparatorFancy #HoverSepTop {
+              @Anchor = Anchor(Top: 10, Bottom: 2);
+              Visible: false;
+            }
+
+            @PanelCategory #HoverStats {
+            }
+
+            @PanelCategory #HoverMovement {
+            }
+
+            @PanelCategory #HoverEffects {
+            }
+
+            @PanelCategory #HoverEquipment {
+            }
+
+            @AbilitiesBlock #HoverAbilities {
+            }
+
+            $C.@PanelSeparatorFancy #HoverSepBottom {
+              @Anchor = Anchor(Top: 10, Bottom: 6);
+              Visible: false;
+            }
+
+            // What the player can do with the node right now.
+            Label #HoverState {
+              Style: @PanelTextStyle;
+              Text: "";
+            }
           }
         }
       }

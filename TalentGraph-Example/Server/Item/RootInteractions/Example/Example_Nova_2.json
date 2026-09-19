@@ -1,0 +1,6 @@
+{
+  "Interactions": [ "Example_Nova_2" ],
+  "RequireNewClick": true,
+  "Cooldown": { "Id": "Example_Nova_2", "Cooldown": 12 },
+  "Tags": { "Attack": [ "Melee" ] }
+}

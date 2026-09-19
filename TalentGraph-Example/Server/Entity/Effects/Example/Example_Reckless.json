@@ -1,0 +1,12 @@
+{
+  "$Comment": "The price of berserk: slower in water. Debuff: true paints the tooltip line red; ApplyConditions makes it conditional (the tooltip says so), here only while in water.",
+  "Name": "Reckless",
+  "Debuff": true,
+  "Infinite": true,
+  "ApplyConditions": [
+    { "Id": "InFluid", "Tags": [ "Water" ] }
+  ],
+  "ApplicationEffects": {
+    "HorizontalSpeedMultiplier": 0.7
+  }
+}

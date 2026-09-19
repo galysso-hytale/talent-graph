@@ -1,6 +1,7 @@
 package dev.galysso.talentgraph.effect;
 
 import com.hypixel.hytale.assetstore.AssetRegistry;
+import com.hypixel.hytale.protocol.InteractionCooldown;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
@@ -70,6 +71,37 @@ public interface References {
             UnarmedInteractions unarmed = UnarmedInteractions.getAssetMap().getAsset(UnarmedInteractions.DEFAULT_UNARMED_ID);
             return unarmed == null ? null : unarmed.getInteractions().get(slot);
         }
+
+        @Override
+        public String entityEffectName(String id) {
+            EntityEffect effect = EntityEffect.getAssetMap().getAsset(id);
+            return effect == null ? null : effect.getName();
+        }
+
+        @Override
+        public boolean isDebuff(String id) {
+            EntityEffect effect = EntityEffect.getAssetMap().getAsset(id);
+            return effect != null && effect.isDebuff();
+        }
+
+        @Override
+        public boolean hasApplyConditions(String id) {
+            EntityEffect effect = EntityEffect.getAssetMap().getAsset(id);
+            return effect != null && effect.getApplyConditions() != null && effect.getApplyConditions().length > 0;
+        }
+
+        @Override
+        public double rootCooldown(String id) {
+            RootInteraction root = RootInteraction.getAssetMap().getAsset(id);
+            InteractionCooldown cooldown = root == null ? null : root.getCooldown();
+            return cooldown == null ? 0 : cooldown.cooldown;
+        }
+
+        @Override
+        public String itemTranslationKey(String id) {
+            Item item = Item.getAssetMap().getAsset(id);
+            return item == null ? null : item.getTranslationKey();
+        }
     };
 
     /** {@return whether an {@code EntityStatType} of this id is loaded} */
@@ -105,4 +137,33 @@ public interface References {
     /** {@return the root interaction of the unarmed defaults ({@code "Empty"}) on a slot, or null} */
     @Nullable
     String unarmedRootInteraction(InteractionType slot);
+
+    // ---- for the descriptions; nothing below decides what a talent does ----
+
+    /** {@return the {@code "Name"} of an {@code EntityEffect}, null when absent (as in every vanilla file)} */
+    @Nullable
+    default String entityEffectName(String id) {
+        return null;
+    }
+
+    /** {@return whether an {@code EntityEffect} declares {@code "Debuff": true}} */
+    default boolean isDebuff(String id) {
+        return false;
+    }
+
+    /** {@return whether an {@code EntityEffect} only applies under {@code "ApplyConditions"}} */
+    default boolean hasApplyConditions(String id) {
+        return false;
+    }
+
+    /** {@return the cooldown of a {@code RootInteraction} in seconds, 0 when it has none} */
+    default double rootCooldown(String id) {
+        return 0;
+    }
+
+    /** {@return the translation key of an item's name, null for an unknown item} */
+    @Nullable
+    default String itemTranslationKey(String id) {
+        return null;
+    }
 }
