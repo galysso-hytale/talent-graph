@@ -150,7 +150,7 @@
             "Effects": [
                 { "Type": "Ability", "Slot": "Secondary", "Interaction": "Example_Ward",
                   "HeldItem": ["Family=Staff", "Family=Magic"],
-                  "Description": "Ward: half damage for 4 s (3 stamina)" }
+                  "Description": "Ward: half damage for 4 s" }
             ],
             "X": 550,
             "Y": 640
@@ -207,7 +207,8 @@
             "Requires": ["ward"],
             "Effects": [
                 { "Type": "Ability", "Slot": "Pick", "Interaction": "Example_Focus",
-                  "Description": "Focus: 25 mana back, once every 30 s (adventure mode; creative keeps picking blocks)" }
+                  "Description": "Focus: 25 mana back (adventure mode; creative keeps picking blocks)",
+                  "Cooldown": "30 s" }
             ],
             "X": 850,
             "Y": 640

@@ -47,6 +47,12 @@ public final class AbilityEffect extends TalentEffect {
             .append(new KeyedCodec<>("HeldItem", Codec.STRING_ARRAY, false),
                     (e, v) -> e.heldItemText = v, e -> e.heldItemText).add()
             .append(new KeyedCodec<>("Priority", Codec.INTEGER, false), (e, v) -> e.priority = v, e -> e.priority).add()
+            // Words for the notes of the line, when the chain hides them from
+            // the describer: a cost behind a Condition, a cooldown inside the
+            // chain. Free text or a key of the translation tables.
+            .append(new KeyedCodec<>("Cost", Codec.STRING, false), (e, v) -> e.costText = v, e -> e.costText).add()
+            .append(new KeyedCodec<>("Cooldown", Codec.STRING, false),
+                    (e, v) -> e.cooldownText = v, e -> e.cooldownText).add()
             .build();
 
     /**
@@ -65,6 +71,10 @@ public final class AbilityEffect extends TalentEffect {
     @Nullable
     private String[] heldItemText;
     private int priority;
+    @Nullable
+    private String costText;
+    @Nullable
+    private String cooldownText;
     private InteractionType slot;
     private List<ItemMatcher> heldItem = List.of();
 
@@ -108,31 +118,41 @@ public final class AbilityEffect extends TalentEffect {
     }
 
     /**
-     * {@code "[Q] Nova — with a staff in hand · 12 s cooldown"}: the default
-     * key of the slot (the panel shows the configured one), the name of
-     * the rank's root interaction ({@code "Description"}, else a
-     * translation under {@code talentgraph.ability.<Id>}, else the id as
-     * words), then the conditions the effect states: the item to hold and
-     * the root's cooldown. Costs and other conditions live inside the
-     * interaction chain and are not read; the {@code "Description"} is
-     * where to write them. Always a gain.
+     * {@code "[Q] Nova"} with the notes {@code Cost — 100% signature energy},
+     * {@code Cooldown — 12 s}, {@code With — a staff or a wand}: the default
+     * key of the slot, the name of the rank's root interaction
+     * ({@code "Description"}, else a translation under
+     * {@code talentgraph.ability.<Id>}, else the id as words), then the
+     * conditions in a fixed order — the cost a {@code StatsCondition} at
+     * the top of the chain states (or the {@code "Cost"} written on the
+     * effect), the root's cooldown (or the {@code "Cooldown"} written), the
+     * item to hold. Other conditions live inside the chain and are not
+     * read. Always a gain.
      */
     @Override
     protected Line describe(EffectDescriber d, int rank) {
         String id = interactionAt(rank);
         String name = d.label(description, "ability." + id, EffectDescriber.humanise(id));
-        List<String> conditions = new ArrayList<>();
+        List<Line.Note> notes = new ArrayList<>();
+        String cost = d.texts().keyOrRaw(costText);
+        if (cost == null) {
+            cost = d.cost(id);
+        }
+        if (cost != null) {
+            notes.add(d.note("cost", cost));
+        }
+        String cooldown = d.texts().keyOrRaw(cooldownText);
+        if (cooldown == null && d.refs().rootCooldown(id) > 0) {
+            cooldown = d.seconds(d.refs().rootCooldown(id));
+        }
+        if (cooldown != null) {
+            notes.add(d.note("cooldown", cooldown));
+        }
         if (!heldItem.isEmpty()) {
-            conditions.add(d.get("ability.heldItem", "items", d.items(heldItem, true, "list.or")));
+            notes.add(d.note("heldItem", d.items(heldItem, true, "list.or")));
         }
-        double cooldown = d.refs().rootCooldown(id);
-        if (cooldown > 0) {
-            conditions.add(d.get("ability.cooldown", "time", d.seconds(cooldown)));
-        }
-        String suffix = conditions.isEmpty() ? ""
-                : d.get("ability.conditions", "conditions", String.join(d.get("ability.conditionSeparator"), conditions));
-        return new Line(Line.Category.ABILITIES, Line.Sign.GAIN, d.get("ability.key", "key", d.key(slot)), name, suffix,
-                SLOTS.indexOf(slot), slot, fromRank, true);
+        return new Line(Line.Category.ABILITIES, Line.Sign.GAIN, d.get("ability.key", "key", d.key(slot)), name, "",
+                notes, SLOTS.indexOf(slot), slot, fromRank, true);
     }
 
     public InteractionType slot() {

@@ -62,13 +62,17 @@ final class TalentTooltip {
     // ---- rows ----
 
     /**
-     * One row of a card or panel body: the sorted line and its text. An
-     * ability row leaves out its key, shown as a glyph or key cap beside it.
+     * One row of a card or panel body: the sorted line, its text, the
+     * value the player has now when the rank changes it (shown before an
+     * arrow), and its notes. An ability row leaves out its key, shown as a
+     * glyph or key cap beside it.
      *
-     * @param line    the line at the rank shown
-     * @param message the text, coloured
+     * @param line     the line at the rank shown
+     * @param name     the text, coloured
+     * @param previous the current value, or null when nothing changes
+     * @param notes    the conditions, one per line under the text
      */
-    record Row(Line line, Message message) {
+    record Row(Line line, Message name, @Nullable String previous, List<Line.Note> notes) {
     }
 
     /** {@return the rows of the hover card for the lines of {@link #lines}} */
@@ -76,11 +80,11 @@ final class TalentTooltip {
         List<Row> rows = new ArrayList<>();
         for (Line line : lines) {
             String text = line.slot() == null ? line.text() : line.textWithoutPrefix();
-            Message message = Message.raw(text).color(color(line.sign()));
+            Message name = Message.empty().insert(Message.raw(text).color(color(line.sign())));
             if (!line.active()) {
-                message = Message.empty().insert(message).insert(Message.raw(" " + fromRank(line)).color(COLOR_INACTIVE));
+                name.insert(Message.raw(" " + fromRank(line)).color(COLOR_INACTIVE));
             }
-            rows.add(new Row(line, message));
+            rows.add(new Row(line, name, line.previous(), line.notes()));
         }
         return rows;
     }
@@ -115,7 +119,7 @@ final class TalentTooltip {
         for (TalentEffect effect : effects) {
             Line line = describer.describe(effect, shown, shown);
             if (line != null) {
-                rows.add(new Row(line, panelText(effect, line, rank, maxRank)));
+                rows.add(new Row(line, panelText(effect, line, rank, maxRank), null, line.notes()));
             }
         }
         rows.sort((a, b) -> Line.comparator(texts.order()).compare(a.line, b.line));
@@ -125,9 +129,6 @@ final class TalentTooltip {
     private Message panelText(TalentEffect effect, Line line, int rank, int maxRank) {
         String color = color(line.sign());
         Message text = Message.empty();
-        if (line.slot() == null && !line.prefix().isEmpty()) {
-            text.insert(Message.raw(line.prefix() + " ").color(color));
-        }
         // The value of each rank, when it changes with the rank.
         List<String> values = new ArrayList<>();
         boolean varies = false;

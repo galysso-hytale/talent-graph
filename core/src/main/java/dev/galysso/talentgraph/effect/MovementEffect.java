@@ -5,6 +5,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * {@code "Type": "Movement"} — modifies one of the player's movement
@@ -67,7 +68,7 @@ public final class MovementEffect extends TalentEffect {
         double value = amount.at(rank);
         boolean higherWins = setting != MovementSetting.ROLL_TIME_TO_COMPLETE;
         Line.Sign sign = EffectDescriber.sign(value, calculation, higherWins);
-        return new Line(Line.Category.MOVEMENT, sign, "", d.amount(value, calculation), label,
+        return new Line(Line.Category.MOVEMENT, sign, "", d.amount(value, calculation), label, List.of(),
                 setting.ordinal(), null, fromRank, true);
     }
 

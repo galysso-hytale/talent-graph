@@ -1,0 +1,24 @@
+// One condition of a line (Row.ui), appended by the server under #Notes:
+// a bullet, the kind of condition in a fixed-width column so that values
+// line up, and the value.
+Group {
+  LayoutMode: Left;
+  Anchor: (Top: 2);
+
+  Group {
+    Anchor: (Left: 6, Top: 6, Width: 6, Height: 6, Right: 8);
+    Background: (TexturePath: "Node/PipOff.png");
+  }
+
+  Label #NoteLabel {
+    Anchor: (Width: 78);
+    Style: (FontSize: 13, TextColor: #96a9be);
+    Text: "";
+  }
+
+  Label #NoteText {
+    FlexWeight: 1;
+    Style: (FontSize: 13, TextColor: #c9d4e0, Wrap: true);
+    Text: "";
+  }
+}

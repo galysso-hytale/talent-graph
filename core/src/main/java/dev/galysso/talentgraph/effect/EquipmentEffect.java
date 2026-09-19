@@ -78,7 +78,7 @@ public final class EquipmentEffect extends TalentEffect {
         String list = d.or(description, d.items(items, false, "list.and"));
         String text = d.get(mode == Mode.ALLOW ? "equipment.allow" : "equipment.forbid", "items", list);
         Line.Sign sign = mode == Mode.ALLOW ? Line.Sign.GAIN : Line.Sign.LOSS;
-        return new Line(Line.Category.EQUIPMENT, sign, "", text, "", Line.NO_ORDER, null, fromRank, true);
+        return new Line(Line.Category.EQUIPMENT, sign, "", text, "", List.of(), Line.NO_ORDER, null, fromRank, true);
     }
 
     public Mode mode() {

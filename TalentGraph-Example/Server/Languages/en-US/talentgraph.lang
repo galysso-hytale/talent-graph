@@ -7,12 +7,14 @@
 effect.Example_Vigor_Regen_1 = Slow regeneration
 effect.Example_Vigor_Regen_2 = Regeneration
 
-ability.Example_Bolt_1 = Arcane bolt I (10 mana)
-ability.Example_Bolt_2 = Arcane bolt II (10 mana)
-ability.Example_Bolt_3 = Arcane bolt III (10 mana; crouch and hold for two)
-ability.Example_Mend_1 = Mend I: 15 health (20 mana)
-ability.Example_Mend_2 = Mend II: 30 health (20 mana)
-ability.Example_Nova_1 = Nova I: 15 fire damage around you (full signature bar)
-ability.Example_Nova_2 = Nova II: 25 fire damage around you (full signature bar)
+# Costs and cooldowns are not written here: the tooltip reads them from the
+# root interaction and the StatsCondition at the top of its chain.
+ability.Example_Bolt_1 = Arcane bolt I
+ability.Example_Bolt_2 = Arcane bolt II
+ability.Example_Bolt_3 = Arcane bolt III (crouch and hold: two bolts for 20 mana)
+ability.Example_Mend_1 = Mend I: 15 health
+ability.Example_Mend_2 = Mend II: 30 health
+ability.Example_Nova_1 = Nova I: 15 fire damage around you
+ability.Example_Nova_2 = Nova II: 25 fire damage around you
 ability.Example_Storm = Storm: Nova II, sooner
-ability.Example_Blink = Blink (4 stamina)
+ability.Example_Blink = Blink

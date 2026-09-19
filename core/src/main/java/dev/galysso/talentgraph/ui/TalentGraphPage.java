@@ -34,7 +34,6 @@ import dev.galysso.talentgraph.asset.GraphEffects;
 import dev.galysso.talentgraph.asset.GraphProblem;
 import dev.galysso.talentgraph.asset.GraphReport;
 import dev.galysso.talentgraph.asset.LoadedGraph;
-import dev.galysso.talentgraph.effect.AbilityEffect;
 import dev.galysso.talentgraph.effect.Line;
 import dev.galysso.talentgraph.effect.References;
 import dev.galysso.talentgraph.effect.TalentEffect;
@@ -104,6 +103,8 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final String PAGE_UI = "Pages/TalentGraph/TalentGraphPage.ui";
     private static final String NODE_UI = "Pages/TalentGraph/Node.ui";
+    private static final String ROW_UI = "Pages/TalentGraph/Row.ui";
+    private static final String NOTE_UI = "Pages/TalentGraph/Note.ui";
     // Swap for OrthogonalLinkRenderer if the tiled lines prove too heavy.
     private static final LinkRenderer LINKS = new SpriteLinkRenderer();
     private static final String ACTION_CLOSE = "Close";
@@ -716,7 +717,7 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         // Rough height, for keeping the card inside the stage: the layout
         // decides the real one.
         int height = 36 + 26 + (talent.maxRank() > 1 ? 18 : 0) + (lore != null ? 40 : 0) + problems.size() * 19
-                + (rows > 0 ? 24 + rows * 22 + categories(lines) * 40 : 0) + 22;
+                + (rows > 0 ? 24 + rows * 22 + notes(lines) * 19 + categories(lines) * 40 : 0) + 22;
         int size = camera.scale(GraphLayout.NODE_SIZE);
         GraphLayout.Point p = position(talent);
         int nodeLeft = camera.screenX(p.x());
@@ -735,6 +736,14 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         commands.set("#Hover.Visible", true);
     }
 
+    private static int notes(List<Line> lines) {
+        int count = 0;
+        for (Line line : lines) {
+            count += line.notes().size();
+        }
+        return count;
+    }
+
     private static int categories(List<Line> lines) {
         Set<Line.Category> seen = new HashSet<>();
         for (Line line : lines) {
@@ -745,9 +754,10 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
 
     /**
      * Fills the category groups of a body ({@code #Hover…} or
-     * {@code #Detail…}): a group per category with a heading and the rows
-     * as coloured spans, the abilities as one row per slot, the first
-     * shown group without its separator.
+     * {@code #Detail…}): a group per category with a heading and one
+     * {@code Row.ui} per row — key column for abilities, previous value and
+     * arrow when the rank changes it, one {@code Note.ui} per condition —
+     * the first shown group without its separator.
      *
      * @return the number of rows shown
      */
@@ -756,29 +766,47 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
         int shown = 0;
         for (Line.Category category : Line.Category.values()) {
             String group = prefix + category.name().charAt(0) + category.name().substring(1).toLowerCase(Locale.ROOT);
-            Message text = Message.empty();
-            boolean any = false;
-            Map<String, Message> bySlot = new HashMap<>();
+            String list = group + " #Rows";
+            commands.clear(list);
+            int index = 0;
             for (TalentTooltip.Row row : rows) {
                 if (row.line().category() != category) {
                     continue;
                 }
-                if (category == Line.Category.ABILITIES && row.line().slot() != null) {
-                    Message existing = bySlot.get(row.line().slot().name());
-                    if (existing == null) {
-                        bySlot.put(row.line().slot().name(), row.message());
-                    } else {
-                        existing.insert(Message.raw("\n")).insert(row.message());
-                    }
-                } else {
-                    if (any) {
-                        text.insert(Message.raw("\n"));
-                    }
-                    text.insert(row.message());
+                commands.append(list, ROW_UI);
+                String selector = list + "[" + index++ + "]";
+                commands.set(selector + " #Name.TextSpans", row.name());
+                if (row.previous() != null) {
+                    commands.set(selector + " #Old.Text", row.previous());
+                    commands.set(selector + " #Old.Visible", true);
+                    commands.set(selector + " #Arrow.Visible", true);
                 }
-                any = true;
-                shown++;
+                InteractionType slot = row.line().slot();
+                if (slot != null) {
+                    commands.set(selector + " #Key.Visible", true);
+                    String glyph = switch (slot) {
+                        case Primary -> "MouseLeft";
+                        case Secondary -> "MouseRight";
+                        case Pick -> "MouseMiddle";
+                        default -> null;
+                    };
+                    if (glyph != null) {
+                        commands.set(selector + " #" + glyph + ".Visible", true);
+                    } else {
+                        commands.set(selector + " #Cap.Visible", true);
+                        commands.set(selector + " #KeyText.Text", words.texts().get("talentgraph.key." + slot.name()));
+                    }
+                }
+                int note = 0;
+                for (Line.Note n : row.notes()) {
+                    commands.append(selector + " #Notes", NOTE_UI);
+                    String noteSelector = selector + " #Notes[" + note++ + "]";
+                    commands.set(noteSelector + " #NoteLabel.Text", n.label());
+                    commands.set(noteSelector + " #NoteText.Text", n.value());
+                }
             }
+            boolean any = index > 0;
+            shown += index;
             commands.set(group + ".Visible", any);
             if (!any) {
                 continue;
@@ -786,23 +814,6 @@ public final class TalentGraphPage extends InteractiveCustomUIPage<TalentGraphPa
             commands.set(group + " #Sep.Visible", !first);
             first = false;
             commands.set(group + " #Heading.Text", words.heading(category));
-            if (category == Line.Category.ABILITIES) {
-                for (InteractionType slot : AbilityEffect.SLOTS) {
-                    Message row = bySlot.get(slot.name());
-                    commands.set(group + " #Slot" + slot.name() + ".Visible", row != null);
-                    if (row != null) {
-                        commands.set(group + " #Slot" + slot.name() + " #Text.TextSpans", row);
-                        // Keyboard slots carry the default key as text; mouse slots have their glyph.
-                        if (slot != InteractionType.Primary && slot != InteractionType.Secondary
-                                && slot != InteractionType.Pick) {
-                            commands.set(group + " #Slot" + slot.name() + " #Key.Text",
-                                    words.texts().get("talentgraph.key." + slot.name()));
-                        }
-                    }
-                }
-            } else {
-                commands.set(group + " #Text.TextSpans", text);
-            }
         }
         return shown;
     }

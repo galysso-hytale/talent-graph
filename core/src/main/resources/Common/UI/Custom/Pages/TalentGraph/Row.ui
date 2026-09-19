@@ -1,0 +1,87 @@
+// One line of a hover card or detail panel body, appended by the server
+// under a category's #Rows: an optional key column (abilities), then the
+// line — the previous value in a muted colour and an arrow when the rank
+// changes it — and its notes (Note.ui), one per line.
+@KeyStyle = LabelStyle(
+  FontSize: 14,
+  RenderBold: true,
+  RenderUppercase: true,
+  FontName: "Secondary",
+  TextColor: #ffffff(0.8),
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
+Group {
+  LayoutMode: Left;
+  Anchor: (Top: 3);
+
+  // The key of an ability: a fixed square with the default key of the
+  // slot, or the game's glyph for a mouse button.
+  Group #Key {
+    Visible: false;
+    Anchor: (Width: 40, Right: 10);
+    LayoutMode: CenterMiddle;
+
+    Group #Cap {
+      Visible: false;
+      Anchor: (Width: 32, Height: 32);
+      Background: (TexturePath: "../../Common/InputBinding.png", Border: 6);
+      LayoutMode: CenterMiddle;
+
+      Label #KeyText {
+        Style: @KeyStyle;
+        Text: "";
+      }
+    }
+
+    Group #MouseLeft {
+      Visible: false;
+      Anchor: (Width: 26, Height: 26);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseLeftClick.png");
+    }
+
+    Group #MouseRight {
+      Visible: false;
+      Anchor: (Width: 26, Height: 26);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseRightClick.png");
+    }
+
+    Group #MouseMiddle {
+      Visible: false;
+      Anchor: (Width: 26, Height: 26);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseMiddleClick.png");
+    }
+  }
+
+  Group {
+    FlexWeight: 1;
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+
+      Label #Old {
+        Visible: false;
+        Style: (FontSize: 14, TextColor: #6b7a8c);
+        Text: "";
+      }
+
+      Group #Arrow {
+        Visible: false;
+        Anchor: (Width: 14, Height: 10, Left: 5, Right: 5, Top: 4);
+        Background: (TexturePath: "Row/Arrow.png");
+      }
+
+      Label #Name {
+        FlexWeight: 1;
+        Style: (FontSize: 14, TextColor: #c9d4e0, Wrap: true);
+        Text: "";
+      }
+    }
+
+    Group #Notes {
+      LayoutMode: Top;
+    }
+  }
+}

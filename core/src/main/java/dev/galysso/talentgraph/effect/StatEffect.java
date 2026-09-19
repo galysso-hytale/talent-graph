@@ -5,6 +5,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * {@code "Type": "Stat"} — modifies the maximum (or minimum) of an entity
@@ -87,7 +88,7 @@ public final class StatEffect extends TalentEffect {
         String label = d.get("target." + target.id(), "stat", name);
         double value = amount.at(rank);
         Line.Sign sign = EffectDescriber.sign(value, calculation, StatLabels.higherWins(stat, target));
-        return new Line(Line.Category.STATS, sign, "", d.amount(value, calculation), label,
+        return new Line(Line.Category.STATS, sign, "", d.amount(value, calculation), label, List.of(),
                 StatLabels.order(stat), null, fromRank, true);
     }
 

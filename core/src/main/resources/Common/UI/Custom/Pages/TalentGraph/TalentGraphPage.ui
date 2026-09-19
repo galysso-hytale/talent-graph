@@ -42,12 +42,10 @@ $C = "../../Common.ui";
   Wrap: true
 );
 
-// One category of the panel: a thin separator (hidden on the first one
-// shown), a heading in small capitals, the lines as coloured spans.
+// One category of a card or panel body: a thin separator (hidden on the
+// first one shown), a heading in small capitals, then the lines the
+// server appends (Row.ui).
 @PanelCategory = Group {
-  @Heading = "";
-  @Text = "";
-
   Visible: false;
   LayoutMode: Top;
 
@@ -57,110 +55,12 @@ $C = "../../Common.ui";
 
   Label #Heading {
     Style: (...$C.@SubtitleStyle, FontSize: 13);
-    Anchor: (Bottom: 4);
-    Text: @Heading;
-  }
-
-  Label #Text {
-    Style: @PanelTextStyle;
-    Text: @Text;
-  }
-};
-
-// One ability row of the panel: the key, then the ability. Six rows, one
-// per slot, shown when the talent uses the slot. A keyboard slot shows the
-// default key of the slot in the key-cap frame of the tool legends (the
-// client's HotkeyLabel, which would show the bound key, renders an empty
-// frame outside the HUD and refuses a Style); a mouse slot shows the
-// game's mouse glyph, as the legends do.
-@PanelSlotText = Group {
-  FlexWeight: 1;
-  LayoutMode: Middle;
-
-  Label #Text {
-    Style: @PanelTextStyle;
-    Text: "";
-  }
-};
-
-@PanelSlot = Group {
-  Visible: false;
-  LayoutMode: Left;
-  Anchor: (Top: 4);
-
-  Group {
-    LayoutMode: MiddleCenter;
-    Padding: (Horizontal: 6, Vertical: 4);
-    Anchor: (MinWidth: 48, Right: 10);
-    Background: (TexturePath: "../../Common/InputBinding.png", Border: 6);
-
-    Label #Key {
-      Style: (FontSize: 14, RenderBold: true, RenderUppercase: true, FontName: "Secondary", TextColor: #ffffff(0.8));
-      Text: "";
-    }
-  }
-
-  @PanelSlotText {
-  }
-};
-
-@PanelMouseSlot = Group {
-  @Icon = "";
-
-  Visible: false;
-  LayoutMode: Left;
-  Anchor: (Top: 4);
-
-  Group {
-    LayoutMode: MiddleCenter;
-    Anchor: (Width: 48, Right: 10);
-
-    Group {
-      Anchor: (Width: 22, Height: 22);
-      Background: (TexturePath: @Icon);
-    }
-  }
-
-  @PanelSlotText {
-  }
-};
-
-// The abilities of a talent: one row per slot, mouse glyphs for the mouse
-// slots, the default key for the keyboard ones. Shared by the hover card
-// and the detail panel.
-@AbilitiesBlock = Group {
-  Visible: false;
-  LayoutMode: Top;
-
-  $C.@ContentSeparator #Sep {
-    @Anchor = Anchor(Top: 8, Bottom: 8);
-  }
-
-  Label #Heading {
-    Style: (...$C.@SubtitleStyle, FontSize: 13);
-    Anchor: (Bottom: 4);
+    Anchor: (Bottom: 2);
     Text: "";
   }
 
-  @PanelMouseSlot #SlotPrimary {
-    @Icon = "../../Common/SmallInputIconMouseLeftClick.png";
-  }
-
-  @PanelMouseSlot #SlotSecondary {
-    @Icon = "../../Common/SmallInputIconMouseRightClick.png";
-  }
-
-  @PanelSlot #SlotAbility1 {
-  }
-
-  @PanelSlot #SlotAbility2 {
-  }
-
-  @PanelSlot #SlotAbility3 {
-  }
-
-  @PanelMouseSlot #SlotPick {
-    @Icon = "../../Common/SmallInputIconMouseMiddleClick.png";
+  Group #Rows {
+    LayoutMode: Top;
   }
 };
 
@@ -460,7 +360,7 @@ $C.@PageOverlay {
             @PanelCategory #DetailEquipment {
             }
 
-            @AbilitiesBlock #DetailAbilities {
+            @PanelCategory #DetailAbilities {
             }
 
             $C.@PanelSeparatorFancy #DetailSepBottom {
@@ -539,7 +439,7 @@ $C.@PageOverlay {
             @PanelCategory #HoverEquipment {
             }
 
-            @AbilitiesBlock #HoverAbilities {
+            @PanelCategory #HoverAbilities {
             }
 
             $C.@PanelSeparatorFancy #HoverSepBottom {

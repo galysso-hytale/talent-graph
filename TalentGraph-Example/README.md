@@ -128,10 +128,10 @@ runs a vanilla root (`RunRootInteraction`) before its own effect.
 ## Descriptions
 
 Hover a node: a card lists what the talent gives, one line per effect,
-generated from the file — `+10 -> +20 Max health`, `Can use: iron armor`,
-`Nova - with a staff in hand, 12 s cooldown` beside the glyph of its key.
-Gains are green, losses red, what a later rank gives grey with
-`(from rank 2)`. Right-click a node for the detail panel: the same lines
+generated from the file — `+10 ➜ +20 Max health`, `Can use: iron armor`,
+`Nova` beside the glyph of its key with its cost, cooldown and item in
+hand on the lines under it. Gains are green, losses red, what a later rank
+gives grey with `(from rank 2)`. Right-click a node for the detail panel: the same lines
 with the value of every rank, and the longer texts.
 
 Three places take your own words:
@@ -143,8 +143,11 @@ Three places take your own words:
 - `"Description"` on an **effect** (`ward`, `focus`, `flaming_blade`):
   replaces the generated label of that line — the name of the spell, the
   name of the entity effect, the item list — and keeps the rest: colour,
-  key, item in hand, cooldown. This is where a spell's cost goes: the mod
-  reads the root's cooldown, not what happens inside the chain.
+  key, and the notes under the line (`Cost`, `Cooldown`, `With`). The
+  cost is read from the `StatsCondition` at the top of the spell's chain,
+  the cooldown from the root; when the chain hides them (`focus` keeps its
+  cooldown inside a `Condition`), `"Cost"` and `"Cooldown"` on the effect
+  give the words.
 
 Without a description, a spell or an entity effect is named after its file
 (`Example_Blink` → "Example Blink"), or after the effect's `"Name"` when

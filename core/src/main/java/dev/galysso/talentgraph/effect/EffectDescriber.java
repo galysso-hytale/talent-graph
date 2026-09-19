@@ -5,6 +5,7 @@ import com.hypixel.hytale.protocol.InteractionType;
 import javax.annotation.Nullable;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -65,7 +66,8 @@ public final class EffectDescriber {
     /**
      * Describes one effect at a rank. An effect that does not apply yet at
      * that rank gives an inactive line; one whose value changes between
-     * the player's rank and the rank shown gives {@code "+10 → +20"}.
+     * the player's rank and the rank shown remembers the current value
+     * ({@link Line#previous}), which the card shows before an arrow.
      *
      * @return the line, or null for an effect with nothing to say
      */
@@ -77,12 +79,12 @@ public final class EffectDescriber {
         }
         if (!effect.appliesAt(shownRank)) {
             return new Line(line.category(), Line.Sign.INACTIVE, line.prefix(), line.value(), line.suffix(),
-                    line.order(), line.slot(), effect.fromRank(), false);
+                    line.notes(), line.order(), line.slot(), effect.fromRank(), false);
         }
         if (currentRank >= 1 && currentRank < shownRank && effect.appliesAt(currentRank) && !line.value().isEmpty()) {
             Line before = effect.describe(this, currentRank);
             if (before != null && !before.value().equals(line.value())) {
-                line = line.withValue(get("tooltip.upgrade", "from", before.value(), "to", line.value()));
+                line = line.withPrevious(before.value());
             }
         }
         return line;
@@ -156,6 +158,34 @@ public final class EffectDescriber {
     /** {@return the default key of a slot, as the tooltip shows it (the panel shows the configured one)} */
     public String key(InteractionType slot) {
         return get("key." + slot.name());
+    }
+
+    /**
+     * {@return the cost of a root interaction as words, or null when its
+     * chain states none where the describer can read it} Read from a
+     * {@code StatsCondition} at the top of the chain, the vanilla recipe:
+     * {@code "10 mana"}, {@code "100% signature energy"}.
+     */
+    @Nullable
+    public String cost(String rootId) {
+        List<References.Cost> costs = new ArrayList<>(refs.rootCosts(rootId));
+        if (costs.isEmpty()) {
+            return null;
+        }
+        // Stats in their fixed order, as the stat lines are.
+        costs.sort(Comparator.comparingInt((References.Cost c) -> StatLabels.order(c.stat()))
+                .thenComparing(References.Cost::stat));
+        List<String> parts = new ArrayList<>();
+        for (References.Cost cost : costs) {
+            String stat = label(null, "stat." + cost.stat(), humanise(cost.stat()));
+            parts.add(get(cost.percent() ? "note.costPercent" : "note.costAbsolute", "n", number(cost.amount()), "stat", stat));
+        }
+        return join(parts, "list.and");
+    }
+
+    /** {@return a note of the given kind, the label translated} */
+    public Line.Note note(String kind, String value) {
+        return new Line.Note(get("note." + kind), value);
     }
 
     // ---- item lists ----

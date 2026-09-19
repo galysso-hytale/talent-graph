@@ -3,13 +3,20 @@ package dev.galysso.talentgraph.effect;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.protocol.InteractionCooldown;
 import com.hypixel.hytale.protocol.InteractionType;
+import com.hypixel.hytale.protocol.ValueType;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.UnarmedInteractions;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.none.StatsConditionBaseInteraction;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -102,6 +109,39 @@ public interface References {
             Item item = Item.getAssetMap().getAsset(id);
             return item == null ? null : item.getTranslationKey();
         }
+
+        @Override
+        public List<Cost> rootCosts(String id) {
+            RootInteraction root = RootInteraction.getAssetMap().getAsset(id);
+            String[] chain = root == null ? null : root.getInteractionIds();
+            if (chain == null || chain.length == 0) {
+                return List.of();
+            }
+            Interaction first = Interaction.getAssetMap().getAsset(chain[0]);
+            if (!(first instanceof StatsConditionBaseInteraction condition)) {
+                return List.of();
+            }
+            // The config keeps its costs behind protected fields, without getters.
+            try {
+                Field rawCosts = StatsConditionBaseInteraction.class.getDeclaredField("rawCosts");
+                Field valueType = StatsConditionBaseInteraction.class.getDeclaredField("valueType");
+                rawCosts.setAccessible(true);
+                valueType.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                Map<String, Float> costs = (Map<String, Float>) rawCosts.get(condition);
+                boolean percent = valueType.get(condition) == ValueType.Percent;
+                if (costs == null) {
+                    return List.of();
+                }
+                List<Cost> result = new ArrayList<>();
+                for (Map.Entry<String, Float> e : costs.entrySet()) {
+                    result.add(new Cost(e.getKey(), e.getValue(), percent));
+                }
+                return result;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                return List.of();
+            }
+        }
     };
 
     /** {@return whether an {@code EntityStatType} of this id is loaded} */
@@ -165,5 +205,25 @@ public interface References {
     @Nullable
     default String itemTranslationKey(String id) {
         return null;
+    }
+
+    /**
+     * One cost a {@code StatsCondition} checks.
+     *
+     * @param stat    the stat id
+     * @param amount  the amount, absolute or a percentage of the maximum
+     * @param percent whether the amount is a percentage
+     */
+    record Cost(String stat, double amount, boolean percent) {
+    }
+
+    /**
+     * {@return the costs stated by a {@code StatsCondition} at the top of a
+     * root interaction's chain, empty when the chain starts otherwise}
+     * Only the first interaction of the root is read: a cost deeper in the
+     * chain (behind a {@code Condition}) is the author's to describe.
+     */
+    default List<Cost> rootCosts(String id) {
+        return List.of();
     }
 }

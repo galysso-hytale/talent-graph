@@ -6,6 +6,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -52,7 +53,7 @@ public final class EntityEffectLink extends TalentEffect {
      * The name of the rank's effect: the {@code "Description"}, else a
      * translation a pack supplies under {@code talentgraph.effect.<Id>},
      * else the asset's {@code "Name"}, else its id as words. Red when the
-     * asset says {@code "Debuff": true}; "(conditional)" when it only
+     * asset says {@code "Debuff": true}; a "Conditional" note when it only
      * applies under conditions the asset states.
      */
     @Override
@@ -62,8 +63,8 @@ public final class EntityEffectLink extends TalentEffect {
         String name = d.label(description, "effect." + id,
                 assetName != null ? assetName : EffectDescriber.humanise(id));
         Line.Sign sign = d.refs().isDebuff(id) ? Line.Sign.LOSS : Line.Sign.GAIN;
-        String suffix = d.refs().hasApplyConditions(id) ? d.get("tooltip.conditional") : "";
-        return new Line(Line.Category.EFFECTS, sign, "", name, suffix, Line.NO_ORDER, null, fromRank, true);
+        List<Line.Note> notes = d.refs().hasApplyConditions(id) ? List.of(d.note("conditional", "")) : List.of();
+        return new Line(Line.Category.EFFECTS, sign, "", name, "", notes, Line.NO_ORDER, null, fromRank, true);
     }
 
     /** {@return the {@code EntityEffect} asset id held at a rank, the last one repeating; rank counts from 1} */

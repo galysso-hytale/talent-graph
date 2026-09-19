@@ -85,22 +85,28 @@ by the client's tooltip, so it holds separators, the mouse glyphs and key
 caps of the game beside the abilities, and colours:
 
 ```
-        Toughness
-        Rank 1/3
-  Old scars, thick skin.
+          Toughness
+          Rank 1/3
+    Old scars, thick skin.
 ──────────── ◆ ────────────
 STATS
-+10 -> +20 Max health
-×0.9 Max stamina
+  +10 ➜ +20 Max health              (+10 muted, an arrow, +20 green)
+  ×0.9 Max stamina                  (red)
+─────────────────────────
+ABILITIES
+ [Q]  Nova
+        · Cost       100% signature energy
+        · Cooldown   12 s
+        · With       a staff or a wand
 ─────────────────────────
 EFFECTS
-Slow regeneration (from rank 2)
+  Slow regeneration (from rank 2)   (grey)
 ──────────── ◆ ────────────
 Click to upgrade (2 point(s))
 ```
 
 - The rank described is the **next** one while the talent can still grow
-  (what the click gives, with an arrow from the current value when it
+  (what the click gives; the current value stands before an arrow when it
   changes), the current one once maxed.
 - **Green** is a gain, **red** a loss: a negative or below-1 amount, an
   entity effect with `"Debuff": true`, a `Forbid`. Which way is a gain is
@@ -111,11 +117,15 @@ Click to upgrade (2 point(s))
   the order of the tables below (the same in every language), your own
   stats after them alphabetically; item lists, entity effects and
   abilities alphabetically in the player's language.
-- An ability reads `Nova - with a staff in hand, 12 s cooldown` beside
-  the glyph of its key (the mouse buttons, or the default key of the slot
-  in a key cap), then what the effect states (the `HeldItem`, the root
-  interaction's `Cooldown`). Costs and other conditions live inside the
-  chain and are not read: write them.
+- An ability shows its name beside the glyph of its key (the mouse
+  buttons, or the default key of the slot in a key cap), and under it its
+  **notes**, one per line, the kind in a fixed column: `Cost` (read from
+  a `StatsCondition` at the **top** of the root's chain, absolute or
+  percent), `Cooldown` (the root's `Cooldown`), `With` (the `HeldItem`).
+  A cost behind a `Condition` or a cooldown inside the chain is not seen:
+  write `"Cost": "10 mana; 20 when charged"` or `"Cooldown": "30 s"` on
+  the effect and the note shows those words. An entity effect with
+  `ApplyConditions` gets the note `Conditional`.
 
 **Right-click** a node for the detail panel: the same lines with the value
 of every rank (`+10 / +20 / +35`, the current one in bold), `FromRank` on
@@ -128,7 +138,7 @@ tables (see below):
 |---|---|---|
 | `Description` | the talent | One line under the title, in the tooltip and the panel. Lore, mostly. |
 | `Details` | the talent | A paragraph at the bottom of the panel only. |
-| `Description` | an effect | Replaces the generated **label** of that line — the spell's name, the entity effect's name, the item list — and keeps its structure: colour, key, item in hand, cooldown, `(from rank N)`. Where a spell's cost goes. |
+| `Description` | an effect | Replaces the generated **label** of that line — the spell's name, the entity effect's name, the item list — and keeps its structure: colour, key, notes, `(from rank N)`. |
 
 Without a `Description`, a spell or an entity effect is named after its
 file (`MyPack_Blink` → "MyPack Blink"), or after the entity effect's
@@ -493,6 +503,7 @@ only while a matching item is held.
 | `Interaction` | yes | A `RootInteraction` id — a file `Server/Item/RootInteractions/<Id>.json` in your pack — or an array with one id per rank, the last repeating. Only the id of the current rank is bound. | — |
 | `HeldItem` | no | Item list (as for `Equipment`). The ability is only bound while the judged item matches. Absent: always bound, empty hand included. | always |
 | `Priority` | no | Integer, see [Several abilities on one key](#several-abilities-on-one-key). | 0 |
+| `Cost`, `Cooldown` | no | Text for the notes of the tooltip line, when the chain hides them (see [Tooltips](#tooltips)). Free text or a translation key. | read from the chain |
 
 The ability itself is written with Hytale's interaction toolkit
 (`ChangeStat` for a heal, `Selector` + `DamageEntity` for a nova,
@@ -564,7 +575,8 @@ recipe (`Wand_Cast_Left_Charged`):
 ```
 
 - `StatsCondition` refuses when the stat is short and runs `Failed`;
-  `ChangeStat` pays. Mind each stat's scale (see the [vanilla
+  `ChangeStat` pays. Put it at the top of the chain and the tooltip shows
+  the cost. Mind each stat's scale (see the [vanilla
   stats](#vanilla-stats) table): `Stamina` runs from 0 to **10**, `Mana`
   to what opens it, `SignatureEnergy` to what the **wielded weapon**
   declares (sword 20, mace 8, most staffs nothing at all) and it only
@@ -584,7 +596,7 @@ recipe (`Wand_Cast_Left_Charged`):
   keeps the chain from starting again for that long, and is what the
   tooltip shows; `RequireNewClick` stops a held button from repeating.
   `CooldownCondition` + `TriggerCooldown` put a cooldown on one branch
-  only (unseen by the tooltip: say it in the effect's `Description`).
+  only (unseen by the tooltip: give the effect a `"Cooldown"` text).
 - `ModifyInventory` with `ItemToRemove` consumes an item (ammunition,
   reagent); `AdjustHeldItemDurability` wears the held item.
 - `TalentGraph_NoMana` and `TalentGraph_NoStamina`

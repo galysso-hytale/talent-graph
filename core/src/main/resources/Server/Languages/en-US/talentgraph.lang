@@ -133,12 +133,15 @@ key.Ability2 = E
 key.Ability3 = R
 key.Pick = Middle click
 ability.key = [{key}]
-ability.heldItem = with {items} in hand
-ability.cooldown = {time} cooldown
-# Plain ASCII: the game's font lacks the em dash, the middle dot and the arrow.
-ability.conditions = - {conditions}
-ability.conditionSeparator = ", "
 unit.seconds = {n} s
+
+# === notes under a line: the kind of condition, in a fixed column, then its value ===
+note.cost = Cost
+note.costAbsolute = {n} {stat}
+note.costPercent = {n}% {stat}
+note.cooldown = Cooldown
+note.heldItem = With
+note.conditional = Conditional
 
 # === equipment ===
 equipment.allow = Can use: {items}
@@ -155,8 +158,6 @@ category.Movement = Movement
 category.Effects = Effects
 category.Equipment = Equipment
 category.Abilities = Abilities
-tooltip.conditional = (conditional)
-tooltip.upgrade = {from} -> {to}
 tooltip.fromRank = (from rank {rank})
 panel.rankSeparator = " / "
 panel.hint = Right-click a talent for details
