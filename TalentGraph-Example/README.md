@@ -97,6 +97,15 @@ least once.
   flame staff by id with `"Priority": 1`, so on that staff the signature
   key casts Storm instead of Nova; `battle_mage` wraps the sword's own
   vanilla signature and adds a nova after it (`RunRootInteraction`).
+  In game, the abilities bound right now show under the mana bar, one
+  square each with the talent's icon and its key; `nova` gives its
+  ability an `"Icon"` of its own (`Ingredient_Fire_Essence`, the same
+  words as a talent's `"Icon"`), since the talent's picture is about the
+  signature energy it adds. A spell the player cannot cast right now is
+  greyed — on cooldown, or short of mana or stamina — and a cooldown
+  shows as a veil sinking as it recovers. Every cooldown of the example
+  sits on the root interaction: one field the game enforces and the
+  tooltip and HUD read, nothing to repeat in the graph.
 - **`Movement`** — `spring` raises jump height by a tenth. Small values:
   speed changes everyone's game, not only the player's.
 
@@ -121,8 +130,7 @@ A spell is three Hytale files and one line in the graph:
 
 Read the `$Comment` at the top of each file: `Example_Bolt_3` branches on
 crouching (`Condition`) and charging (`Charging`); `Example_Focus` keeps
-a vanilla behaviour in creative mode (`RequiredGameMode`) and puts its
-cooldown inside the chain rather than on the root; `Example_Blade_Nova`
+a vanilla behaviour in creative mode (`RequiredGameMode`); `Example_Blade_Nova`
 runs a vanilla root (`RunRootInteraction`) before its own effect.
 
 ## Descriptions
@@ -145,9 +153,9 @@ Three places take your own words:
   name of the entity effect, the item list — and keeps the rest: colour,
   key, and the notes under the line (`Cost`, `Cooldown`, `With`). The
   cost is read from the `StatsCondition` at the top of the spell's chain,
-  the cooldown from the root; when the chain hides them (`focus` keeps its
-  cooldown inside a `Condition`), `"Cost"` and `"Cooldown"` on the effect
-  give the words.
+  the cooldown from the root; when the chain hides them (a cost behind a
+  `Condition`, a cooldown on one branch), `"Cost"` and `"Cooldown"` on
+  the effect give the words — a copy you keep aligned, so prefer the root.
 
 Without a description, a spell or an entity effect is named after its file
 (`Example_Blink` → "Example Blink"), or after the effect's `"Name"` when

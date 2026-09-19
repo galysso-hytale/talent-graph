@@ -1,0 +1,18 @@
+// The talent abilities the player can use right now: one square per bound
+// slot (Slot.ui), appended by the server under #Slots in slot order. Posted
+// as a custom HUD by ui/AbilityHud; hidden while nothing is bound.
+//
+// Placed under the mana bar, on the left, away from the game's own list of
+// the held item's inputs on the right. Adjust the two offsets to taste.
+@Left = 24;
+@Bottom = 20;
+
+Group #Root {
+  Visible: false;
+  Anchor: (Left: @Left, Bottom: @Bottom, Height: 56);
+  LayoutMode: Left;
+
+  Group #Slots {
+    LayoutMode: Left;
+  }
+}

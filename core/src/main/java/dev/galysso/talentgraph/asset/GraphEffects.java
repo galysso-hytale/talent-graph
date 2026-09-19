@@ -25,12 +25,16 @@ import javax.annotation.Nullable;
  *                  has no entry
  * @param blurbs    the {@code "Description"} and {@code "Details"} of each
  *                  talent that wrote one, as written
+ * @param icons     the resolved icon asset path of each talent that has one,
+ *                  the image the ability HUD shows for the talent's abilities
  */
 public record GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<TalentEffect>> byTalent,
-                           Map<TalentId, Set<TalentId>> ancestors, Map<TalentId, Blurb> blurbs) {
+                           Map<TalentId, Set<TalentId>> ancestors, Map<TalentId, Blurb> blurbs,
+                           Map<TalentId, String> icons) {
 
     /** A graph with no effect at all. */
-    public static final GraphEffects NONE = new GraphEffects(EquipmentBaseline.NONE, Map.of(), Map.of(), Map.of());
+    public static final GraphEffects NONE = new GraphEffects(EquipmentBaseline.NONE, Map.of(), Map.of(), Map.of(),
+            Map.of());
 
     public GraphEffects {
         Objects.requireNonNull(baseline, "baseline");
@@ -38,17 +42,24 @@ public record GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<Talent
         byTalent = Collections.unmodifiableMap(new LinkedHashMap<>(byTalent));
         ancestors = Map.copyOf(ancestors);
         blurbs = Map.copyOf(blurbs);
+        icons = Map.copyOf(icons);
     }
 
     /** A graph whose talents require nothing of one another and say nothing of themselves. */
     public GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<TalentEffect>> byTalent) {
-        this(baseline, byTalent, Map.of(), Map.of());
+        this(baseline, byTalent, Map.of(), Map.of(), Map.of());
     }
 
     /** A graph whose talents say nothing of themselves. */
     public GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<TalentEffect>> byTalent,
                         Map<TalentId, Set<TalentId>> ancestors) {
-        this(baseline, byTalent, ancestors, Map.of());
+        this(baseline, byTalent, ancestors, Map.of(), Map.of());
+    }
+
+    /** A graph whose talents have no icon. */
+    public GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<TalentEffect>> byTalent,
+                        Map<TalentId, Set<TalentId>> ancestors, Map<TalentId, Blurb> blurbs) {
+        this(baseline, byTalent, ancestors, blurbs, Map.of());
     }
 
     /**
@@ -68,6 +79,12 @@ public record GraphEffects(EquipmentBaseline baseline, Map<TalentId, List<Talent
     /** {@return what a talent says of itself, both parts null when it says nothing} */
     public Blurb blurb(TalentId talent) {
         return blurbs.getOrDefault(talent, new Blurb(null, null));
+    }
+
+    /** {@return the icon asset path of a talent, null if it declares none} */
+    @Nullable
+    public String icon(TalentId talent) {
+        return icons.get(talent);
     }
 
     /** {@return the effects of a talent, empty if it has none} */

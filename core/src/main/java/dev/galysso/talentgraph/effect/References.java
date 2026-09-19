@@ -39,6 +39,11 @@ public interface References {
         }
 
         @Override
+        public int statIndex(String id) {
+            return EntityStatType.getAssetMap().getIndex(id);
+        }
+
+        @Override
         public boolean hasEntityEffect(String id) {
             return EntityEffect.getAssetMap().getIndex(id) != Integer.MIN_VALUE;
         }
@@ -105,6 +110,13 @@ public interface References {
         }
 
         @Override
+        public String rootCooldownId(String id) {
+            RootInteraction root = RootInteraction.getAssetMap().getAsset(id);
+            InteractionCooldown cooldown = root == null ? null : root.getCooldown();
+            return cooldown == null || cooldown.cooldownId == null ? id : cooldown.cooldownId;
+        }
+
+        @Override
         public String itemTranslationKey(String id) {
             Item item = Item.getAssetMap().getAsset(id);
             return item == null ? null : item.getTranslationKey();
@@ -146,6 +158,11 @@ public interface References {
 
     /** {@return whether an {@code EntityStatType} of this id is loaded} */
     boolean hasStat(String id);
+
+    /** {@return the index of a stat in the player's stat map, {@code Integer.MIN_VALUE} if unknown} */
+    default int statIndex(String id) {
+        return Integer.MIN_VALUE;
+    }
 
     /** {@return whether an {@code EntityEffect} of this id is loaded} */
     boolean hasEntityEffect(String id);
@@ -199,6 +216,16 @@ public interface References {
     /** {@return the cooldown of a {@code RootInteraction} in seconds, 0 when it has none} */
     default double rootCooldown(String id) {
         return 0;
+    }
+
+    /**
+     * {@return the key under which the player's cooldown handler tracks a
+     * {@code RootInteraction}: its {@code Cooldown.Id} when it names one,
+     * else its own id — the key a {@code TriggerCooldown} inside the chain
+     * should use to be seen}
+     */
+    default String rootCooldownId(String id) {
+        return id;
     }
 
     /** {@return the translation key of an item's name, null for an unknown item} */

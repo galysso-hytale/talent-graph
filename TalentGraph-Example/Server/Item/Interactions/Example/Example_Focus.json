@@ -1,36 +1,19 @@
 {
-  "$Comment": "Focus: in adventure mode, 25 mana back, once every 30 s (the cooldown sits in this branch, not on the root, so that in creative the key keeps its vanilla job of picking the block aimed at).",
+  "$Comment": "Focus: in adventure mode, 25 mana back; the 30 s cooldown is on the root. In creative the key keeps its vanilla job of picking the block aimed at (a Condition on the game mode).",
   "Type": "Condition",
   "RequiredGameMode": "Adventure",
   "Next": {
-    "Type": "CooldownCondition",
-    "Id": "Example_Focus",
-    "Failed": {
-      "Type": "TalentGraph_Notify",
-      "Message": "Focus is recovering"
-    },
-    "Next": {
-      "Type": "Serial",
-      "Interactions": [
+    "Type": "ChangeStat",
+    "StatModifiers": { "Mana": 25 },
+    "RunTime": 0.4,
+    "Effects": {
+      "ItemAnimationId": "Interact",
+      "WorldSoundEventId": "SFX_Ice_Break",
+      "Particles": [
         {
-          "Type": "TriggerCooldown",
-          "Cooldown": { "Id": "Example_Focus", "Cooldown": 30 }
-        },
-        {
-          "Type": "ChangeStat",
-          "StatModifiers": { "Mana": 25 },
-          "RunTime": 0.4,
-          "Effects": {
-            "ItemAnimationId": "Interact",
-            "WorldSoundEventId": "SFX_Ice_Break",
-            "Particles": [
-              {
-                "SystemId": "Blue_Beam",
-                "TargetEntityPart": "Entity",
-                "TargetNodeName": "Hip"
-              }
-            ]
-          }
+          "SystemId": "Blue_Beam",
+          "TargetEntityPart": "Entity",
+          "TargetNodeName": "Hip"
         }
       ]
     }

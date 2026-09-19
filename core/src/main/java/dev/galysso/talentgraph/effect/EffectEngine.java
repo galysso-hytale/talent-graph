@@ -19,8 +19,10 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.PlayerTalents;
 import dev.galysso.talentgraph.api.TalentGraphApi;
+import dev.galysso.talentgraph.ui.AbilityHud;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -88,6 +90,7 @@ public final class EffectEngine {
         int effects = 0;
         int keys = 0;
         int equipment = 0;
+        List<AbilityHud.Slot> abilities = List.of();
         EntityStatMap statMap = accessor.getComponent(ref, EntityStatMap.getComponentType());
         if (statMap != null) {
             stats = StatSync.sync(statMap, talents::rank, catalog, EntityStatType.getAssetMap()::getIndex);
@@ -112,11 +115,20 @@ public final class EffectEngine {
             EquipmentSync.Refusal refusal = EquipmentSync.judge(held, rules, creative);
             // One write for both: the refusal takes its keys from the
             // abilities. Two partial writes would give back each other's keys.
+            Map<InteractionType, AbilityRules.Bound> bound =
+                    AbilitySync.bound(held, AbilityRules.compile(catalog, talents::rank));
             Map<InteractionType, String> overrides = new EnumMap<>(InteractionType.class);
-            overrides.putAll(AbilitySync.desired(held, AbilityRules.compile(catalog, talents::rank)));
+            overrides.putAll(AbilitySync.desired(bound));
             overrides.putAll(refusal.overrides());
-            keys = InteractionOverrides.sync(ref, accessor, applied, overrides);
+            keys = InteractionOverrides.sync(ref, accessor, applied, overrides, catalog.ownedRoots()::contains);
             equipment = EquipmentSync.sync(ref, accessor, refusal, rules, creative, deniedType);
+            abilities = AbilityHud.slots(bound, References.LIVE);
+        }
+        // The HUD shows what was bound: nothing for a dead player, whose
+        // keys were not written either.
+        Player player = accessor.getComponent(ref, Player.getComponentType());
+        if (player != null) {
+            AbilityHud.sync(player, playerRef, abilities);
         }
         if (stats > 0 || effects > 0 || keys > 0 || equipment > 0) {
             logger.at(Level.FINE).log(

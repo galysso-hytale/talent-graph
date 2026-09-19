@@ -202,7 +202,7 @@ public final class GraphLoader {
             return null;
         }
         String resolved = resolveIcon(reference);
-        if (isMissing(resolved)) {
+        if (isMissingAsset(resolved)) {
             warning(id, "Icon not found: " + resolved);
         }
         return resolved;
@@ -224,9 +224,13 @@ public final class GraphLoader {
         }
         Map<TalentId, List<TalentEffect>> byTalent = new LinkedHashMap<>();
         Map<TalentId, GraphEffects.Blurb> blurbs = new HashMap<>();
+        Map<TalentId, String> icons = new HashMap<>();
         for (Map.Entry<TalentId, Entry> e : entries.entrySet()) {
             TalentId id = e.getKey();
             Entry entry = e.getValue();
+            if (entry.icon != null) {
+                icons.put(id, entry.icon);
+            }
             GraphEffects.Blurb blurb = new GraphEffects.Blurb(blank(entry.def.getDescription()), blank(entry.def.getDetails()));
             if (!blurb.isEmpty()) {
                 blurbs.put(id, blurb);
@@ -253,7 +257,7 @@ public final class GraphLoader {
         Map<TalentId, Set<TalentId>> ancestors = ancestors();
         warnAbilities(byTalent, ancestors);
         warnIdleAllows(baseline, byTalent);
-        return new GraphEffects(baseline, byTalent, ancestors, blurbs);
+        return new GraphEffects(baseline, byTalent, ancestors, blurbs, icons);
     }
 
     /** {@return the text, or null when absent or blank} */
@@ -719,7 +723,7 @@ public final class GraphLoader {
     }
 
     /** Whether the server knows no such asset; never claims so before any asset is indexed. */
-    private static boolean isMissing(String path) {
+    public static boolean isMissingAsset(String path) {
         return !CommonAssetRegistry.getAllAssets().isEmpty() && !CommonAssetRegistry.hasCommonAsset(path);
     }
 

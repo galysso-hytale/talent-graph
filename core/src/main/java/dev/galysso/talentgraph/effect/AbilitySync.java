@@ -2,6 +2,7 @@ package dev.galysso.talentgraph.effect;
 
 import com.hypixel.hytale.protocol.InteractionType;
 
+import java.util.EnumMap;
 import java.util.Map;
 
 /**
@@ -27,6 +28,25 @@ final class AbilitySync {
      * @return the root interaction id wanted under each slot
      */
     static Map<InteractionType, String> desired(HeldItems held, AbilityRules rules) {
-        return rules.isEmpty() ? Map.of() : rules.resolve(held);
+        return desired(bound(held, rules));
+    }
+
+    /**
+     * The abilities in force for a player, per slot.
+     *
+     * @param held  what the player holds
+     * @param rules the abilities in force for the player
+     */
+    static Map<InteractionType, AbilityRules.Bound> bound(HeldItems held, AbilityRules rules) {
+        return rules.isEmpty() ? Map.of() : rules.bind(held);
+    }
+
+    /** {@return the root interaction id wanted under each slot, from what is bound} */
+    static Map<InteractionType, String> desired(Map<InteractionType, AbilityRules.Bound> bound) {
+        Map<InteractionType, String> desired = new EnumMap<>(InteractionType.class);
+        for (Map.Entry<InteractionType, AbilityRules.Bound> e : bound.entrySet()) {
+            desired.put(e.getKey(), e.getValue().rootId());
+        }
+        return desired;
     }
 }

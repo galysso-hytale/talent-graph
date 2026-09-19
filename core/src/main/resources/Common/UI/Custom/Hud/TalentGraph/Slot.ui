@@ -1,0 +1,105 @@
+// One ability of the HUD block: its icon on a badge, its key over the
+// bottom-right corner, greyed while it cannot be used, its cooldown as a
+// veil sinking over the icon. Mouse buttons use the game's glyphs; a keyboard key
+// is the square with the default key (#Cap). The client's HotkeyLabel
+// (#HotkeyAbility1..3), which would show the key the player really bound,
+// draws nothing in a HUD of ours; kept behind AbilityHud.HOTKEY_LABEL.
+@KeyStyle = LabelStyle(
+  FontSize: 12,
+  RenderBold: true,
+  RenderUppercase: true,
+  FontName: "Secondary",
+  TextColor: #ffffff(0.8),
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
+@KeyBadge = Group {
+  Visible: false;
+  Anchor: (Width: 26, Height: 22);
+  Background: (TexturePath: "../../Common/InputBinding.png", Border: 6);
+  LayoutMode: CenterMiddle;
+};
+
+Group {
+  Anchor: (Width: 56, Height: 56, Right: 6);
+
+  Group {
+    Anchor: (Left: 0, Top: 0, Width: 50, Height: 50);
+    Background: (TexturePath: "../../Pages/TalentGraph/Node/Badge.png", Border: 6);
+
+    Group {
+      LayoutMode: CenterMiddle;
+
+      AssetImage #Icon {
+        Anchor: (Width: 40, Height: 40);
+        FallbackTexturePath: "UI/Custom/Pages/TalentGraph/Icons/Missing.png";
+      }
+    }
+
+    // Not usable right now (cooldown, or a stat cost the player cannot
+    // pay): the icon greyed under #Dim, strongly, so that it reads at a
+    // glance. On cooldown, #Sweep besides, darker, anchored at the bottom,
+    // whose height the server sets to the fraction of the cooldown left
+    // (AbilityHud.SWEEP_HEIGHT at the start, 0 when over).
+    Group #Dim {
+      Visible: false;
+      Anchor: (Left: 3, Top: 3, Right: 3, Bottom: 3);
+      Background: #000000(0.6);
+    }
+
+    Group #Sweep {
+      Visible: false;
+      Anchor: (Left: 3, Bottom: 3, Width: 44, Height: 44);
+      Background: #000000(0.85);
+    }
+  }
+
+  Group #Key {
+    Anchor: (Right: 0, Bottom: 0, Width: 26, Height: 26);
+    LayoutMode: CenterMiddle;
+
+    Group #MouseLeft {
+      Visible: false;
+      Anchor: (Width: 22, Height: 22);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseLeftClick.png");
+    }
+
+    Group #MouseRight {
+      Visible: false;
+      Anchor: (Width: 22, Height: 22);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseRightClick.png");
+    }
+
+    Group #MouseMiddle {
+      Visible: false;
+      Anchor: (Width: 22, Height: 22);
+      Background: (TexturePath: "../../Common/SmallInputIconMouseMiddleClick.png");
+    }
+
+    @KeyBadge #HotkeyAbility1 {
+      HotkeyLabel {
+        InputBindingKey: "Ability1ItemAction";
+      }
+    }
+
+    @KeyBadge #HotkeyAbility2 {
+      HotkeyLabel {
+        InputBindingKey: "Ability2ItemAction";
+      }
+    }
+
+    @KeyBadge #HotkeyAbility3 {
+      HotkeyLabel {
+        InputBindingKey: "Ability3ItemAction";
+      }
+    }
+
+    @KeyBadge #Cap {
+      Label #KeyText {
+        Style: @KeyStyle;
+        Text: "";
+      }
+    }
+  }
+}

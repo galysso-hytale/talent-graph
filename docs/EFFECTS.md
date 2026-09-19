@@ -124,7 +124,9 @@ Click to upgrade (2 point(s))
   percent), `Cooldown` (the root's `Cooldown`), `With` (the `HeldItem`).
   A cost behind a `Condition` or a cooldown inside the chain is not seen:
   write `"Cost": "10 mana; 20 when charged"` or `"Cooldown": "30 s"` on
-  the effect and the note shows those words. An entity effect with
+  the effect and the note shows those words — a second copy of a value
+  the chain holds, yours to keep aligned; put the cooldown on the root
+  and there is nothing to copy. An entity effect with
   `ApplyConditions` gets the note `Conditional`.
 
 **Right-click** a node for the detail panel: the same lines with the value
@@ -324,11 +326,13 @@ Rules of thumb:
 
 Vanilla clears every entity effect when a player dies and again when they
 respawn; the talent effects are put back on respawn. They are saved with
-the player like any effect, so a reconnection changes nothing. The mod
-also keeps, on the player, the list of ids it placed: a talent removed
-from a graph while the player was away has its effect taken back at their
-next world entry, and an effect whose file disappeared is dropped by the
-server itself. Syncs happen at the same moments as for `Stat` — world
+the player like any effect, so a reconnection changes nothing. An
+*infinite* effect whose id a loaded graph can place is the mod's (talents
+place infinite effects, potions timed ones) and is taken back when no
+ranked talent holds it; the mod also keeps, on the player, the list of
+ids it placed, for a talent removed from a graph while the player was
+away: its effect is taken back at their next world entry. An effect whose
+file disappeared is dropped by the server itself. Syncs happen at the same moments as for `Stat` — world
 entry, unlock, reset, graph load, reload or removal — plus respawn.
 
 ## Equipment
@@ -468,12 +472,15 @@ item, the armour or the game mode change. Each pass:
 
 - Resolves the item in hand and in the off hand, and writes the refusal
   under the player's `Interactions` component (the same one vanilla and
-  other plugins use to override keys), remembering in
-  `TalentGraphApplied.Interactions` which keys it wrote. It only takes a
-  key that is free or already its own, and only gives back one that still
-  holds what it wrote; a key of its own rewritten by someone else is
-  forgotten, not touched. The component is created on the first key and
-  removed when it becomes empty.
+  other plugins use to override keys). A key is the mod's when it holds
+  an id of the mod's — the refusal's root, or a root an ability of a
+  loaded graph can bind — or when `TalentGraphApplied.Interactions`, the
+  record of what it wrote, says so; the rule comes first, the record only
+  matters for a root no loaded graph names any more (a talent deleted from
+  its file while the root stayed). It only takes a key that is free or its
+  own, and only gives back one of its own; a key of its own rewritten by
+  someone else is forgotten, not touched. The component is created on the
+  first key and removed when it becomes empty.
 - Marks the player (`HeldItemDenied`, transient) so that a ticking system
   strips the item's stat modifiers right after vanilla recomputes them,
   before anything is sent to the client.
@@ -504,6 +511,8 @@ only while a matching item is held.
 | `HeldItem` | no | Item list (as for `Equipment`). The ability is only bound while the judged item matches. Absent: always bound, empty hand included. | always |
 | `Priority` | no | Integer, see [Several abilities on one key](#several-abilities-on-one-key). | 0 |
 | `Cost`, `Cooldown` | no | Text for the notes of the tooltip line, when the chain hides them (see [Tooltips](#tooltips)). Free text or a translation key. | read from the chain |
+| `Icon` | no | The picture of the ability in the [HUD](#ability-hud): a vanilla item id or a path, written like the talent's `Icon`. One picture whatever the rank. | the talent's icon |
+| `CooldownId` | no | Escape hatch: the id of a cooldown the chain keeps for itself (`TriggerCooldown` / `CooldownCondition`), for the [HUD](#ability-hud). Never the root's own id. A cooldown on the root needs nothing. | the root's `Cooldown.Id`, else its id |
 
 The ability itself is written with Hytale's interaction toolkit
 (`ChangeStat` for a heal, `Selector` + `DamageEntity` for a nova,
@@ -528,7 +537,7 @@ AZERTY in brackets):
 | `Ability1` | Q (A) | The weapon's **signature**. Binding it with a `HeldItem` replaces that weapon's signature; without one, every weapon's — the loader warns. |
 | `Ability2` | E | Free: no vanilla item uses it. The natural key for a class ability. |
 | `Ability3` | R | Free, except the crossbow's reload. Empty-handed it is "use block or entity", a duplicate of `Use`. The loader warns when a `HeldItem` covers an item that defines its own `Ability3`. |
-| `Pick` | middle click | Pick block, useful in creative only. The ability's root interaction can keep that behaviour in creative with `Condition` + `RequiredGameMode` (see `Mage_Focus`). |
+| `Pick` | middle click | Pick block, useful in creative only. The ability's root interaction can keep that behaviour in creative with `Condition` + `RequiredGameMode` (see the example's `Example_Focus`). |
 
 **Two-step vanilla abilities.** Some signatures use two keys: the flame
 staff's Q only arms a trap (it sets the stat `DeployablePreview`, which
@@ -553,6 +562,63 @@ top of the root interaction (`Crouching`, `Running`, `Jumping`,
 spell, predicted by the client; `Charging` distinguishes tap from hold;
 `RunRootInteraction` wraps the item's vanilla ability instead of replacing
 it; an id per rank makes the spell grow.
+
+**Which key.** A graph is easier to learn when the three keys of the
+weapon keep their meaning — left click attacks, right click defends, Q is
+the weapon's signature — and talents live on E, R and the middle click.
+The player then never has to relearn a click, the game's own HUD list of
+the held item's inputs stays true, and nothing competes with a weapon for
+its key. Three keys are few; `HeldItem` multiplies them (a different spell
+on E per weapon family) and spell items will (`GrantItem`). Replacing a
+weapon key is allowed — `battle_mage` wraps the sword's signature — and
+the loader only warns on the dangerous cases; the HUD below shows every
+key a talent binds, so the player sees when a click changed.
+
+### Ability HUD
+
+The abilities bound *right now* show in the HUD, one square per slot in
+slot order (left click, right click, Q, E, R, middle click), under the
+mana bar on the left — the game's own list of inputs, on the right, only
+knows the held item's. A square is the picture of the ability with its
+key in the corner: mouse buttons as the game draws them, a keyboard key
+as the player really bound it. The block is hidden while nothing is
+bound.
+
+Shown is exactly what the keys run: the winner of
+[Several abilities on one key](#several-abilities-on-one-key) for what
+the player holds. An ability whose `HeldItem` is not in hand, or that
+lost its slot to another talent, is not there; change weapon and the
+block follows. No name: right-click the talent in the graph for that.
+
+An ability the player cannot use right now is greyed, strongly: on
+cooldown, or short of a stat cost — the `StatsCondition` at the top of
+its chain, checked as the game checks it (absolute value, or percentage
+of the stat's range). A cooling one also carries a darker veil that
+sinks as the cooldown runs out, as action bars do; with `Charges` on the
+root, the veil only shows once every charge is spent, for the time to
+the next one. The server reads cooldowns and stats ten times a second
+and rewrites the squares that changed. Not read: the game mode, crouching,
+an `EffectCondition`, anything deeper in the chain, and a `Cost` written
+as text — such an ability looks usable until it fails.
+
+**Put the cooldown on the root.** One field, `Cooldown` on the root
+interaction: the game enforces it, the tooltip shows it, the HUD reads it
+under the root's id (or its `Cooldown.Id`), and the graph writes nothing.
+The example does so everywhere. A cooldown inside the chain
+(`TriggerCooldown` / `CooldownCondition`) is the exception, and it costs
+you two copies to keep aligned: `CooldownId` on the effect for the HUD
+and `Cooldown` text for the tooltip. It also **must not reuse the root's
+id**: a root without a `Cooldown` gets the game's 0.35 s click cooldown
+under its own id at every click, which would collide with the chain's and
+read as "still recovering" for ever. The root's per-game-mode `Settings`
+cooldown ids are not followed.
+
+The picture is the talent's `Icon`, which the player already met in the
+graph; `Icon` on the effect replaces it when the talent's picture is
+about something else (the example's `nova` adds signature energy *and* a
+spell) or when one talent binds several keys. Neither → the missing-icon
+picture. The file is `Common/UI/Custom/Hud/TalentGraph/Abilities.ui`;
+its two offsets set the position.
 
 ### Costs, cooldowns, ammunition
 
@@ -596,7 +662,9 @@ recipe (`Wand_Cast_Left_Charged`):
   keeps the chain from starting again for that long, and is what the
   tooltip shows; `RequireNewClick` stops a held button from repeating.
   `CooldownCondition` + `TriggerCooldown` put a cooldown on one branch
-  only (unseen by the tooltip: give the effect a `"Cooldown"` text).
+  only — under an id of its own, never the root's — unseen by the
+  tooltip and the HUD unless the effect repeats it (`"Cooldown"` text,
+  `CooldownId`); prefer the root.
 - `ModifyInventory` with `ItemToRemove` consumes an item (ammunition,
   reagent); `AdjustHeldItemDurability` wears the held item.
 - `TalentGraph_NoMana` and `TalentGraph_NoStamina`
@@ -646,14 +714,19 @@ in hand and in the off hand, decides which one each key runs as vanilla
 does, resolves the six slots on it, merges the result
 with the equipment refusal — the refusal taking its keys — and writes the
 whole under the player's `Interactions` component in one go, with the
-same ownership rules (only free or own keys, only own keys given back,
-recorded in `TalentGraphApplied.Interactions`). The component is
+same ownership rules (a key holding a root of the mod's is the mod's,
+recorded or not; only free or own keys taken, only own keys given
+back). The component is
 replicated to the client, which starts the chain for the bound root
 interaction as it would the item's own, and is saved with the player;
 after a crash the binding stays until the next world entry corrects it,
 and with the pack removed the server drops the unknown ids itself.
 Abilities are bound in creative mode too; only the equipment rules are
-exempt there. A dead player has none; they come back at respawn.
+exempt there. A dead player has none; they come back at respawn. The
+same pass feeds the [HUD](#ability-hud) from the same resolution, and only
+writes the client when the list of bound slots changes; the game drops
+every custom HUD on a world change and the sync at world entry posts it
+again.
 
 ## Movement
 

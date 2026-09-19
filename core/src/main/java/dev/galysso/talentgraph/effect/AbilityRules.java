@@ -68,7 +68,7 @@ public final class AbilityRules {
                     if (effect instanceof AbilityEffect ability && ability.appliesAt(rank)) {
                         bySlot.computeIfAbsent(ability.slot(), k -> new ArrayList<>()).add(new Candidate(
                                 ability.interactionAt(rank), ability.heldItem(), ability.priority(),
-                                talent.getKey(), graph, order++));
+                                talent.getKey(), graph, ability, order++));
                     }
                 }
             }
@@ -82,22 +82,57 @@ public final class AbilityRules {
     }
 
     /**
-     * The root interaction each slot should run, judged on the item
-     * vanilla would run for that key ({@link HeldItems#judged}).
+     * What each slot binds, judged on the item vanilla would run for that
+     * key ({@link HeldItems#judged}).
+     *
+     * @param slot     the slot
+     * @param rootId   the root interaction bound
+     * @param talent   the talent whose ability won
+     * @param effect   that ability
+     * @param graph    the talent's graph
+     */
+    public record Bound(InteractionType slot, String rootId, TalentId talent, AbilityEffect effect,
+                        GraphEffects graph) {
+
+        /** {@return the image the HUD shows: the effect's own icon, else the talent's, else null} */
+        @Nullable
+        public String iconPath() {
+            String own = effect.iconPath();
+            return own != null ? own : graph.icon(talent);
+        }
+    }
+
+    /**
+     * The ability each slot binds, judged on the item vanilla would run for
+     * that key ({@link HeldItems#judged}).
+     *
+     * @param held what the player holds
+     * @return the winning ability per slot, only the slots that have one
+     */
+    public Map<InteractionType, Bound> bind(HeldItems held) {
+        Map<InteractionType, Bound> bound = new EnumMap<>(InteractionType.class);
+        for (InteractionType slot : bySlot.keySet()) {
+            HeldItems.Held judged = held.judged(slot);
+            Candidate winner = judged == null
+                    ? winner(slot, null, tag -> false)
+                    : winner(slot, judged.id(), judged::hasTag);
+            if (winner != null) {
+                bound.put(slot, new Bound(slot, winner.rootId, winner.talent, winner.effect, winner.graph));
+            }
+        }
+        return bound;
+    }
+
+    /**
+     * The root interaction each slot should run.
      *
      * @param held what the player holds
      * @return the root interaction id per slot, only the slots that have one
      */
     public Map<InteractionType, String> resolve(HeldItems held) {
         Map<InteractionType, String> desired = new EnumMap<>(InteractionType.class);
-        for (InteractionType slot : bySlot.keySet()) {
-            HeldItems.Held judged = held.judged(slot);
-            String root = judged == null
-                    ? resolve(slot, null, tag -> false)
-                    : resolve(slot, judged.id(), judged::hasTag);
-            if (root != null) {
-                desired.put(slot, root);
-            }
+        for (Map.Entry<InteractionType, Bound> e : bind(held).entrySet()) {
+            desired.put(e.getKey(), e.getValue().rootId());
         }
         return desired;
     }
@@ -112,6 +147,12 @@ public final class AbilityRules {
      */
     @Nullable
     public String resolve(InteractionType slot, @Nullable String itemId, IntPredicate hasTag) {
+        Candidate winner = winner(slot, itemId, hasTag);
+        return winner == null ? null : winner.rootId;
+    }
+
+    @Nullable
+    private Candidate winner(InteractionType slot, @Nullable String itemId, IntPredicate hasTag) {
         Candidate winner = null;
         int winnerSpecificity = -1;
         for (Candidate candidate : bySlot.getOrDefault(slot, List.of())) {
@@ -124,11 +165,11 @@ public final class AbilityRules {
                 winnerSpecificity = specificity;
             }
         }
-        return winner == null ? null : winner.rootId;
+        return winner;
     }
 
     private record Candidate(String rootId, List<ItemMatcher> heldItem, int priority, TalentId talent,
-                             GraphEffects graph, int order) {
+                             GraphEffects graph, AbilityEffect effect, int order) {
 
         /** How well the judged item fits: 2 by id, 1 by tag, 0 unconditional, -1 not at all. */
         int specificity(@Nullable String itemId, IntPredicate hasTag) {

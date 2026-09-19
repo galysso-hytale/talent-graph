@@ -4,6 +4,7 @@ import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
+import com.hypixel.hytale.server.core.entity.effect.ActiveEntityEffect;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.galysso.talentgraph.api.TalentId;
@@ -23,10 +24,11 @@ import java.util.function.ToIntFunction;
  * effect whatever the asset says about duration, and removed completely
  * when the talent goes, whatever the asset's removal behaviour. Vanilla
  * clears every effect at death and puts them back at nothing: the applied
- * state is therefore read from the effect controller itself, and what the
- * {@link AppliedEffectsComponent} adds is memory: which of the effects the
- * player carries are ours, so one whose talent vanished from the graphs
- * can be taken back.</p>
+ * state is therefore read from the effect controller itself. Ours are the
+ * infinite effects a loaded graph can place — the rule first — and what
+ * the {@link AppliedEffectsComponent} records, memory for the one whose
+ * talent vanished from the graphs while its asset stayed, so it can be
+ * taken back.</p>
  *
  * <p>An effect the server no longer knows (its file was removed) cannot be
  * removed either; the controller drops it on its own at the next load, and
@@ -54,7 +56,21 @@ final class EntityEffectSync {
         Set<String> desired = desired(rankOf, catalog);
         Set<String> placed = new LinkedHashSet<>();
         int changes = 0;
-        for (String id : applied.entityEffects()) {
+        // Ours: what the record says, and — the rule first — every infinite
+        // effect a loaded graph can place: talents place infinite effects,
+        // potions timed ones. Heals a lost record; the record alone covers
+        // an id no loaded graph knows any more.
+        Set<String> ours = new LinkedHashSet<>(applied.entityEffects());
+        for (String id : catalog.ownedEffects()) {
+            int index = EntityEffect.getAssetMap().getIndex(id);
+            if (index != Integer.MIN_VALUE) {
+                ActiveEntityEffect active = controller.getActiveEffects().get(index);
+                if (active != null && active.isInfinite()) {
+                    ours.add(id);
+                }
+            }
+        }
+        for (String id : ours) {
             if (desired.contains(id)) {
                 continue;
             }

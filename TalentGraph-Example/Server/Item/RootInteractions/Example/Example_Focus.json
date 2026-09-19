@@ -1,5 +1,6 @@
 {
-  "$Comment": "No Cooldown here: the 30 s one sits inside Example_Focus so that creative mode keeps picking blocks freely, and a root cooldown would be what the tooltip shows.",
+  "$Comment": "The cooldown lives here, on the root: the game applies it, the tooltip and the HUD read it, the graph writes nothing. In creative the key also waits 30 s after a Focus; the rest of the time it picks blocks as usual (see the chain).",
+  "Cooldown": 30,
   "Interactions": [ "Example_Focus" ],
   "RequireNewClick": true
 }

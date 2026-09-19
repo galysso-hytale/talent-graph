@@ -4,6 +4,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.protocol.InteractionType;
+import dev.galysso.talentgraph.asset.GraphLoader;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -34,6 +35,13 @@ import java.util.Set;
  * talent that requires the other, then the more specific {@code HeldItem}
  * (an id over a tag over none), then file order. An item the player's
  * equipment rules forbid keeps its refusal whatever the abilities say.</p>
+ *
+ * <p>The abilities in force are shown in the HUD ({@code ui/AbilityHud})
+ * with an image: {@code "Icon"}, written like the talent's own
+ * ({@link GraphLoader#resolveIcon}), else the talent's icon. One image
+ * whatever the rank. The HUD greys the ability while it cannot be used —
+ * cooldown, read under the root's key or {@code "CooldownId"} when the
+ * chain keeps its own, or a stat cost the player cannot pay.</p>
  */
 public final class AbilityEffect extends TalentEffect {
 
@@ -53,6 +61,11 @@ public final class AbilityEffect extends TalentEffect {
             .append(new KeyedCodec<>("Cost", Codec.STRING, false), (e, v) -> e.costText = v, e -> e.costText).add()
             .append(new KeyedCodec<>("Cooldown", Codec.STRING, false),
                     (e, v) -> e.cooldownText = v, e -> e.cooldownText).add()
+            .append(new KeyedCodec<>("Icon", Codec.STRING, false), (e, v) -> e.iconText = v, e -> e.iconText).add()
+            // The key of the cooldown inside the chain, when it is not the
+            // root's: the HUD reads the cooldown under it.
+            .append(new KeyedCodec<>("CooldownId", Codec.STRING, false),
+                    (e, v) -> e.cooldownId = v, e -> e.cooldownId).add()
             .build();
 
     /**
@@ -75,6 +88,12 @@ public final class AbilityEffect extends TalentEffect {
     private String costText;
     @Nullable
     private String cooldownText;
+    @Nullable
+    private String iconText;
+    @Nullable
+    private String iconPath;
+    @Nullable
+    private String cooldownId;
     private InteractionType slot;
     private List<ItemMatcher> heldItem = List.of();
 
@@ -102,6 +121,18 @@ public final class AbilityEffect extends TalentEffect {
             if (heldItem.isEmpty() && heldItemText.length > 0) {
                 v.warn("No entry of \"HeldItem\" could be resolved; the ability would never be available, ignored");
                 return false;
+            }
+        }
+        if (iconText != null) {
+            // A bad icon is not worth losing the ability: the HUD falls back
+            // to the talent's, then to the missing-icon picture.
+            if (iconText.isBlank()) {
+                v.warn("\"Icon\" is empty");
+            } else {
+                iconPath = GraphLoader.resolveIcon(iconText);
+                if (GraphLoader.isMissingAsset(iconPath)) {
+                    v.warn("Icon not found: " + iconPath);
+                }
             }
         }
         return true;
@@ -176,5 +207,17 @@ public final class AbilityEffect extends TalentEffect {
 
     public int priority() {
         return priority;
+    }
+
+    /** {@return the cooldown key the chain uses, null when it is the root's own} */
+    @Nullable
+    public String cooldownId() {
+        return cooldownId == null || cooldownId.isBlank() ? null : cooldownId;
+    }
+
+    /** {@return the asset path of the effect's own icon for the HUD, null to use the talent's} */
+    @Nullable
+    public String iconPath() {
+        return iconPath;
     }
 }

@@ -179,7 +179,7 @@
             "Effects": [
                 { "Type": "Stat", "Stat": "SignatureEnergy", "Amount": 10 },
                 { "Type": "Ability", "Slot": "Ability1", "Interaction": ["Example_Nova_1", "Example_Nova_2"],
-                  "HeldItem": ["Family=Staff", "Family=Magic"] }
+                  "HeldItem": ["Family=Staff", "Family=Magic"], "Icon": "Ingredient_Fire_Essence" }
             ],
             "X": 850,
             "Y": 510
@@ -207,8 +207,7 @@
             "Requires": ["ward"],
             "Effects": [
                 { "Type": "Ability", "Slot": "Pick", "Interaction": "Example_Focus",
-                  "Description": "Focus: 25 mana back (adventure mode; creative keeps picking blocks)",
-                  "Cooldown": "30 s" }
+                  "Description": "Focus: 25 mana back (adventure mode; creative keeps picking blocks)" }
             ],
             "X": 850,
             "Y": 640

@@ -20,6 +20,7 @@ import dev.galysso.talentgraph.internal.LiveReload;
 import dev.galysso.talentgraph.internal.TalentGraphApiImpl;
 import dev.galysso.talentgraph.internal.TalentProgressComponent;
 import dev.galysso.talentgraph.internal.TalentProgressSystem;
+import dev.galysso.talentgraph.ui.AbilityCooldownSystem;
 import dev.galysso.talentgraph.ui.GraphLayouts;
 import dev.galysso.talentgraph.ui.TalentGraphPage;
 
@@ -57,6 +58,7 @@ public class TalentGraphPlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new TalentProgressSystem(getLogger(), api, engine, progressType));
         getEntityStoreRegistry().registerSystem(new RespawnSyncSystem(engine));
         getEntityStoreRegistry().registerSystem(new DeniedItemStatsSystem(deniedType));
+        getEntityStoreRegistry().registerSystem(new AbilityCooldownSystem());
         getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.ActiveSlot(engine));
         getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.SectionChanged(engine));
         getEntityStoreRegistry().registerSystem(new EquipmentTriggerSystems.GameModeChanged(engine));
